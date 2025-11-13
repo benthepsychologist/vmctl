@@ -1,0 +1,8 @@
+*.log
+*.md.backup
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/
+vm-test-report-*.md
