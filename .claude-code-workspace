@@ -1,0 +1,247 @@
+# Claude Code Workspace Guide
+
+This file helps you understand and edit this project with Claude Code.
+
+## Project Overview
+
+**VM Workstation Manager** - Save $91-124/month by replacing Google Cloud Workstations with self-managed VMs.
+
+**Total code:** 3,167 lines
+**Language:** Bash
+**Main entry point:** `bin/vmws`
+
+## Quick Navigation
+
+### Core Files to Edit
+
+1. **`bin/vmws`** (359 lines)
+   - Main CLI tool
+   - All user commands (start, stop, tunnel, etc.)
+   - Configuration management
+   - Entry point for all operations
+
+2. **`scripts/run-vm-test-workflow.sh`** (422 lines)
+   - Main orchestrator
+   - Creates VM, installs everything, validates
+   - Generates reports
+   - Called by: `vmws create`
+
+3. **`scripts/setup-vm-environment.sh`** (94 lines)
+   - Installs: Docker, code-server, neovim
+   - Configures services
+   - Add new software here
+
+4. **`scripts/vm-auto-shutdown.sh`** (46 lines)
+   - Auto-shutdown logic
+   - Monitors idle time
+   - Adjust timeout here
+
+### Documentation
+
+- `README.md` - Main documentation (user-facing)
+- `ARCHITECTURE.md` - Technical deep dive
+- `CONTRIBUTING.md` - Development guide
+- `QUICKSTART.md` - Get started fast
+
+### Configuration Files
+
+- `~/.vmws/config` (created on first run)
+  - VM name, zone, project
+  - User-specific settings
+
+## Common Modifications
+
+### Change Machine Type
+
+**File:** `scripts/create-test-vm.sh`
+**Line:** ~10
+```bash
+MACHINE_TYPE="e2-standard-2"  # Change to e2-standard-4 for more power
+```
+
+### Add Software to VM
+
+**File:** `scripts/setup-vm-environment.sh`
+**Location:** End of file, before final echo
+```bash
+echo "📦 Installing your-tool..."
+sudo apt-get install -y your-tool
+```
+
+### Change Auto-Shutdown Timeout
+
+**On VM:** `/usr/local/bin/vm-auto-shutdown.sh`
+**Line:** ~5
+```bash
+IDLE_TIMEOUT_MINUTES=120  # Change to desired minutes
+```
+
+### Add New CLI Command
+
+**File:** `bin/vmws`
+
+1. Create function (around line 200):
+```bash
+cmd_newcommand() {
+    echo -e "${YELLOW}Doing something...${NC}"
+    # Your code
+}
+```
+
+2. Add to dispatcher (around line 400):
+```bash
+case "$1" in
+    newcommand)
+        cmd_newcommand
+        ;;
+```
+
+3. Update help (around line 50):
+```bash
+  newcommand          Description of command
+```
+
+## Development Workflow
+
+```bash
+# 1. Clone and edit
+git clone https://github.com/benthepsychologist/vm-workstation-manager.git
+cd vm-workstation-manager
+
+# 2. Make changes with Claude Code
+# Edit files as needed
+
+# 3. Test locally
+./bin/vmws --help
+./bin/vmws status
+
+# 4. Test VM creation (on Cloud Workstation)
+./bin/vmws create
+
+# 5. Commit
+git add -A
+git commit -m "Your changes"
+git push
+```
+
+## Code Organization
+
+```
+Main Flow:
+  User runs: vmws create
+      ↓
+  bin/vmws (main CLI)
+      ↓
+  scripts/run-vm-test-workflow.sh (orchestrator)
+      ↓
+      ├─ scripts/create-test-vm.sh (creates VM)
+      ├─ scripts/setup-vm-environment.sh (installs tools)
+      └─ scripts/install-auto-shutdown.sh (sets up auto-shutdown)
+```
+
+## Testing Your Changes
+
+### Test CLI locally
+```bash
+./bin/vmws --help
+./bin/vmws config
+./bin/vmws status
+```
+
+### Test VM operations
+```bash
+# Create VM (from workstation)
+./bin/vmws create
+
+# Start/stop (from local machine)
+vmws start
+vmws status
+vmws stop
+```
+
+### Validate auto-shutdown
+```bash
+vmws ssh
+sudo journalctl -u vm-auto-shutdown -f
+```
+
+## Debugging
+
+### Enable debug mode
+Add to any script:
+```bash
+set -x  # Show all commands
+```
+
+### Check logs
+```bash
+vmws logs                           # Auto-shutdown logs
+vmws ssh
+sudo journalctl -u code-server      # code-server logs
+sudo systemctl status vm-auto-shutdown  # Service status
+```
+
+## Common Issues & Fixes
+
+### Line endings (CRLF vs LF)
+If scripts fail with `\r` errors:
+```bash
+find . -name "*.sh" -exec sed -i 's/\r$//' {} \;
+```
+
+### Permission errors
+```bash
+chmod +x bin/vmws
+chmod +x scripts/*.sh
+```
+
+### gcloud not authenticated
+```bash
+gcloud auth login
+gcloud config set project your-project-id
+```
+
+## File Purposes
+
+| File | Purpose | Edit When |
+|------|---------|-----------|
+| `bin/vmws` | CLI tool | Adding commands, changing UI |
+| `scripts/create-test-vm.sh` | VM creation | Changing machine type, disk size |
+| `scripts/setup-vm-environment.sh` | Software install | Adding tools to VM |
+| `scripts/vm-auto-shutdown.sh` | Auto-shutdown | Changing timeout logic |
+| `scripts/run-vm-test-workflow.sh` | Orchestrator | Changing workflow steps |
+| `README.md` | User docs | User-facing changes |
+| `CONTRIBUTING.md` | Dev docs | Development process changes |
+| `ARCHITECTURE.md` | Tech docs | Architecture changes |
+
+## Variables Reference
+
+### Global (in scripts)
+- `VM_NAME` - Name of the VM
+- `ZONE` - GCP zone
+- `PROJECT` - GCP project ID
+- `MACHINE_TYPE` - VM machine type
+- `DISK_SIZE` - Data disk size
+
+### CLI Config (`~/.vmws/config`)
+- `VM_NAME` - Configured VM name
+- `ZONE` - Configured zone
+- `PROJECT` - Configured project
+
+## Next Steps
+
+1. **Read:** `ARCHITECTURE.md` for deep understanding
+2. **Try:** Make a small change and test it
+3. **Extend:** Add features you need
+4. **Share:** Submit PR if useful to others
+
+## Getting Help
+
+- Check `CONTRIBUTING.md` for code structure
+- Check `ARCHITECTURE.md` for system design
+- Open issue on GitHub
+- Review existing code and comments
+
+---
+
+**Happy coding with Claude Code! 🚀**
