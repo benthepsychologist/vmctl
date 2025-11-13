@@ -174,7 +174,21 @@ cmd_create() {
     echo ""
 
     # Get the script directory
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    # Try to find the repo directory with scripts
+    if [ -d "$(dirname "${BASH_SOURCE[0]}")/../scripts" ]; then
+        # Running from repo
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    elif [ -d "$HOME/vm-workstation-manager/scripts" ]; then
+        # Installed, look in home
+        SCRIPT_DIR="$HOME/vm-workstation-manager"
+    elif [ -d "$(pwd)/vm-workstation-manager/scripts" ]; then
+        # In parent of repo
+        SCRIPT_DIR="$(pwd)/vm-workstation-manager"
+    else
+        echo -e "${RED}Error: Cannot find vm-workstation-manager scripts directory${NC}"
+        echo "Make sure you have the repo cloned at: $HOME/vm-workstation-manager"
+        exit 1
+    fi
 
     echo "🖥️  Creating VM instance with data disk..."
 
@@ -310,7 +324,21 @@ cmd_init_fresh() {
     echo ""
 
     # Get the script directory
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    # Try to find the repo directory with scripts
+    if [ -d "$(dirname "${BASH_SOURCE[0]}")/../scripts" ]; then
+        # Running from repo
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    elif [ -d "$HOME/vm-workstation-manager/scripts" ]; then
+        # Installed, look in home
+        SCRIPT_DIR="$HOME/vm-workstation-manager"
+    elif [ -d "$(pwd)/vm-workstation-manager/scripts" ]; then
+        # In parent of repo
+        SCRIPT_DIR="$(pwd)/vm-workstation-manager"
+    else
+        echo -e "${RED}Error: Cannot find vm-workstation-manager scripts directory${NC}"
+        echo "Make sure you have the repo cloned at: $HOME/vm-workstation-manager"
+        exit 1
+    fi
 
     # Create VM
     echo "🖥️  Creating VM..."
