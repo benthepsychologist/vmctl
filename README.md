@@ -193,6 +193,9 @@ vmws logs
 | `vmws connect` / `vmws ssh` | SSH into VM |
 | `vmws tunnel` | Start IAP tunnel to code-server |
 | `vmws logs` | View auto-shutdown logs |
+| `vmws backup` | Create incremental snapshot of data disk |
+| `vmws snapshots` | List all snapshots |
+| `vmws restore <snapshot>` | Restore VM from snapshot |
 | `vmws config` | Configure VM name/zone/project |
 | `vmws delete` | Delete VM and all resources |
 | `vmws install` | Install CLI on local machine |
@@ -228,6 +231,34 @@ vmws config --vm-name my-dev-vm --zone us-central1-a --project my-project
   - $16/month: Compute (8hrs × $0.067/hr × 30 days)
   - $10/month: Disks (always charged)
 - **Savings: $124/month (83%)**
+
+## Backup & Recovery
+
+**Protect your work with incremental snapshots:**
+
+```bash
+# Create a backup (incremental, only changed blocks)
+vmws backup
+
+# List all backups
+vmws snapshots
+
+# Restore from a backup if something breaks
+vmws restore dev-workstation-backup-20251125-140530
+```
+
+**Why snapshots?**
+- **Incremental:** Only changed blocks are stored (~$0.026/GB/month)
+- **Fast:** First snapshot copies all data, subsequent ones only changes
+- **Safe:** Your insurance if VM breaks or you mess something up
+- **Cheap:** Weekly backups cost pennies
+
+**Recommended schedule:**
+- Before major changes (new software, big config changes)
+- Weekly automated backups
+- Before OS upgrades
+
+Your code should be in git, but snapshots protect your **entire environment** (dotfiles, configs, installed tools, data).
 
 ## Auto-Shutdown
 

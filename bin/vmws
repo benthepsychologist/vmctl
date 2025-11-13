@@ -59,6 +59,9 @@ Commands:
   config              Configure VM name, zone, and project
   ssh                 SSH into the VM
   logs                View auto-shutdown logs
+  backup              Create incremental snapshot of VM data disk
+  restore             Restore VM from a snapshot
+  snapshots           List all snapshots for this VM
 
   install             Install vmws on local machine (Mac/Linux)
 
@@ -74,6 +77,9 @@ Examples:
   vmws tunnel         # Open tunnel to code-server (port 8080)
   vmws status         # Check if VM is running
   vmws stop           # Stop VM to save money
+  vmws backup         # Snapshot your data disk (incremental, cheap!)
+  vmws snapshots      # List all backups
+  vmws restore <snap> # Restore from a snapshot
   vmws delete         # Delete everything
 
 Configuration:
@@ -667,6 +673,163 @@ cmd_logs() {
     gcloud compute ssh "$VM_NAME" --zone="$ZONE" --project="$PROJECT" --tunnel-through-iap --command="sudo journalctl -u vm-auto-shutdown -n 50 --no-pager"
 }
 
+cmd_backup() {
+    echo -e "${YELLOW}Creating backup snapshot of VM data disk...${NC}"
+    echo ""
+
+    # Check if disk exists
+    DISK_NAME="${VM_NAME}-disk"
+    if ! gcloud compute disks describe "$DISK_NAME" --zone="$ZONE" --project="$PROJECT" &>/dev/null; then
+        echo -e "${RED}Error: Disk $DISK_NAME does not exist${NC}"
+        exit 1
+    fi
+
+    # Generate snapshot name with timestamp
+    SNAPSHOT_NAME="${VM_NAME}-backup-$(date +%Y%m%d-%H%M%S)"
+
+    echo "Creating snapshot: $SNAPSHOT_NAME"
+    echo "Disk: $DISK_NAME"
+    echo "Zone: $ZONE"
+    echo ""
+
+    gcloud compute disks snapshot "$DISK_NAME" \
+        --snapshot-names="$SNAPSHOT_NAME" \
+        --zone="$ZONE" \
+        --project="$PROJECT"
+
+    echo ""
+    echo -e "${GREEN}✅ Backup created: $SNAPSHOT_NAME${NC}"
+    echo ""
+    echo "This is an incremental snapshot - only changed blocks are stored."
+    echo "Cost: ~\$0.026/GB/month for changed data only"
+    echo ""
+    echo "To restore from this snapshot:"
+    echo "  vmws restore $SNAPSHOT_NAME"
+    echo ""
+    echo "To list all snapshots:"
+    echo "  vmws snapshots"
+}
+
+cmd_snapshots() {
+    echo "Snapshots for $VM_NAME:"
+    echo "======================="
+    echo ""
+
+    # List snapshots matching this VM name
+    SNAPSHOTS=$(gcloud compute snapshots list \
+        --filter="name~${VM_NAME}" \
+        --format="table(name,creationTimestamp.date('%Y-%m-%d %H:%M'),diskSizeGb,storageBytes.size())" \
+        --project="$PROJECT" 2>/dev/null)
+
+    if [ -z "$SNAPSHOTS" ] || [ "$(echo "$SNAPSHOTS" | wc -l)" -le 1 ]; then
+        echo "No snapshots found for $VM_NAME"
+        echo ""
+        echo "Create a backup:"
+        echo "  vmws backup"
+    else
+        echo "$SNAPSHOTS"
+        echo ""
+        echo "To restore from a snapshot:"
+        echo "  vmws restore <snapshot-name>"
+    fi
+}
+
+cmd_restore() {
+    if [ -z "$1" ]; then
+        echo -e "${RED}Error: Snapshot name required${NC}"
+        echo ""
+        echo "Usage: vmws restore <snapshot-name>"
+        echo ""
+        echo "Available snapshots:"
+        cmd_snapshots
+        exit 1
+    fi
+
+    SNAPSHOT_NAME="$1"
+
+    echo -e "${YELLOW}Restoring VM from snapshot: $SNAPSHOT_NAME${NC}"
+    echo ""
+
+    # Check if snapshot exists
+    if ! gcloud compute snapshots describe "$SNAPSHOT_NAME" --project="$PROJECT" &>/dev/null; then
+        echo -e "${RED}Error: Snapshot $SNAPSHOT_NAME does not exist${NC}"
+        echo ""
+        echo "Available snapshots:"
+        cmd_snapshots
+        exit 1
+    fi
+
+    # Check if VM exists
+    if check_vm_exists; then
+        echo -e "${YELLOW}Warning: VM $VM_NAME already exists${NC}"
+        echo ""
+        read -p "Delete existing VM and restore from snapshot? (yes/no): " -r
+        if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+            echo "Cancelled"
+            exit 0
+        fi
+
+        # Delete existing VM and disk
+        echo ""
+        echo "Deleting existing VM..."
+        gcloud compute instances delete "$VM_NAME" --zone="$ZONE" --project="$PROJECT" --quiet
+
+        echo "Deleting existing disk..."
+        gcloud compute disks delete "${VM_NAME}-disk" --zone="$ZONE" --project="$PROJECT" --quiet
+    fi
+
+    echo ""
+    echo "Creating new disk from snapshot..."
+
+    gcloud compute disks create "${VM_NAME}-disk" \
+        --source-snapshot="$SNAPSHOT_NAME" \
+        --zone="$ZONE" \
+        --project="$PROJECT" \
+        --type=pd-standard
+
+    echo "✅ Disk restored from snapshot"
+    echo ""
+    echo "Creating VM with restored disk..."
+
+    # Get the script directory
+    if [ -d "$(dirname "${BASH_SOURCE[0]}")/../scripts" ]; then
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    elif [ -d "$HOME/vm-workstation-manager/scripts" ]; then
+        SCRIPT_DIR="$HOME/vm-workstation-manager"
+    elif [ -d "$(pwd)/vm-workstation-manager/scripts" ]; then
+        SCRIPT_DIR="$(pwd)/vm-workstation-manager"
+    else
+        echo -e "${RED}Error: Cannot find vm-workstation-manager scripts directory${NC}"
+        exit 1
+    fi
+
+    # Create VM with restored disk
+    MACHINE_TYPE="${MACHINE_TYPE:-e2-standard-2}"
+    BOOT_DISK_SIZE="${BOOT_DISK_SIZE:-50GB}"
+
+    gcloud compute instances create "$VM_NAME" \
+        --machine-type="$MACHINE_TYPE" \
+        --zone="$ZONE" \
+        --project="$PROJECT" \
+        --image-family=debian-12 \
+        --image-project=debian-cloud \
+        --boot-disk-size="$BOOT_DISK_SIZE" \
+        --boot-disk-type=pd-standard \
+        --disk=name="${VM_NAME}-disk",mode=rw \
+        --scopes=cloud-platform \
+        --metadata=enable-oslogin=TRUE \
+        --metadata-from-file=startup-script="${SCRIPT_DIR}/scripts/vm-startup-script.sh"
+
+    echo ""
+    echo -e "${GREEN}✅ VM restored successfully from snapshot!${NC}"
+    echo ""
+    echo "Your VM is starting up..."
+    echo ""
+    echo "Wait a minute, then:"
+    echo "  vmws start    # Ensure it's running"
+    echo "  vmws tunnel   # Connect to code-server"
+}
+
 cmd_install() {
     echo "Installing vmws locally..."
 
@@ -732,6 +895,16 @@ main() {
             ;;
         logs)
             cmd_logs
+            ;;
+        backup)
+            cmd_backup
+            ;;
+        snapshots)
+            cmd_snapshots
+            ;;
+        restore)
+            shift
+            cmd_restore "$@"
             ;;
         install)
             cmd_install
