@@ -29,6 +29,8 @@ save_config() {
 VM_NAME="$VM_NAME"
 ZONE="$ZONE"
 PROJECT="$PROJECT"
+WORKSTATION_DISK="$WORKSTATION_DISK"
+REGION="$REGION"
 EOF
 }
 
@@ -102,20 +104,165 @@ get_vm_status() {
 }
 
 cmd_create() {
-    echo -e "${YELLOW}Creating development VM...${NC}"
+    echo -e "${YELLOW}Creating development VM from workstation snapshot...${NC}"
     echo ""
 
-    # Check if we're on a workstation
-    if [ ! -f "/home/user/run-vm-test-workflow.sh" ]; then
-        echo -e "${RED}Error: Must run 'vmws create' from Cloud Workstation${NC}"
-        echo "This command creates a VM from your workstation's disk snapshot."
+    # Check if VM already exists
+    if check_vm_exists; then
+        echo -e "${RED}Error: VM '$VM_NAME' already exists${NC}"
+        echo "To delete it first: vmws delete"
+        exit 1
+    fi
+
+    # Check if workstation disk is configured
+    if [ -z "$WORKSTATION_DISK" ]; then
+        echo -e "${RED}Error: Workstation disk not configured${NC}"
         echo ""
-        echo "To create a VM from scratch without a workstation:"
+        echo "First, find your workstation disk name:"
+        echo "  gcloud compute disks list --filter='name~workstations'"
+        echo ""
+        echo "Then configure it:"
+        echo "  vmws config --workstation-disk <disk-name> --region <region>"
+        echo ""
+        echo "Or to create a fresh VM without a workstation:"
         echo "  vmws init-fresh"
         exit 1
     fi
 
-    bash /home/user/run-vm-test-workflow.sh
+    # Configuration
+    MACHINE_TYPE="${MACHINE_TYPE:-e2-standard-2}"
+    DISK_SIZE="${DISK_SIZE:-200GB}"
+    BOOT_DISK_SIZE="${BOOT_DISK_SIZE:-50GB}"
+    REGION="${REGION:-$(echo $ZONE | sed 's/-[a-z]$//')}"  # Derive region from zone if not set
+
+    echo "Configuration:"
+    echo "  Workstation Disk: $WORKSTATION_DISK"
+    echo "  Region: $REGION"
+    echo "  VM Name: $VM_NAME"
+    echo "  Zone: $ZONE"
+    echo "  Machine Type: $MACHINE_TYPE"
+    echo ""
+
+    read -p "Continue? (yes/no): " -r
+    if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+        echo "Cancelled"
+        exit 0
+    fi
+
+    echo ""
+    echo "🔄 Creating snapshot from workstation disk..."
+    SNAPSHOT_NAME="workstation-snapshot-$(date +%Y%m%d-%H%M%S)"
+
+    gcloud compute disks snapshot "$WORKSTATION_DISK" \
+        --snapshot-names="$SNAPSHOT_NAME" \
+        --region="$REGION" \
+        --storage-location="$REGION" \
+        --project="$PROJECT"
+
+    echo "✅ Snapshot created: $SNAPSHOT_NAME"
+    echo ""
+    echo "💾 Creating new ${DISK_SIZE} disk from snapshot..."
+
+    gcloud compute disks create "${VM_NAME}-disk" \
+        --source-snapshot="$SNAPSHOT_NAME" \
+        --size="$DISK_SIZE" \
+        --type=pd-standard \
+        --zone="$ZONE" \
+        --project="$PROJECT"
+
+    echo "✅ Disk created: ${VM_NAME}-disk"
+    echo ""
+
+    # Get the script directory
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+    echo "🖥️  Creating VM instance with data disk..."
+
+    gcloud compute instances create "$VM_NAME" \
+        --machine-type="$MACHINE_TYPE" \
+        --zone="$ZONE" \
+        --project="$PROJECT" \
+        --image-family=debian-12 \
+        --image-project=debian-cloud \
+        --boot-disk-size="$BOOT_DISK_SIZE" \
+        --boot-disk-type=pd-standard \
+        --disk=name="${VM_NAME}-disk",mode=rw \
+        --scopes=cloud-platform \
+        --metadata=enable-oslogin=TRUE \
+        --metadata-from-file=startup-script="${SCRIPT_DIR}/scripts/vm-startup-script.sh"
+
+    echo "✅ VM created: $VM_NAME"
+    echo ""
+    echo "📡 Waiting for VM to be ready..."
+    sleep 15
+
+    # Wait for SSH
+    echo "Waiting for SSH..."
+    for i in {1..30}; do
+        if gcloud compute ssh "$VM_NAME" --zone="$ZONE" --project="$PROJECT" --tunnel-through-iap --command="echo ready" &>/dev/null; then
+            echo "✅ SSH ready"
+            break
+        fi
+        sleep 2
+    done
+
+    echo ""
+    echo "🔧 Installing development environment..."
+    echo "This will take 3-5 minutes (Docker, code-server, neovim)..."
+    echo ""
+
+    # Copy setup script to VM
+    gcloud compute scp "${SCRIPT_DIR}/scripts/setup-vm-environment.sh" \
+        "$VM_NAME:/tmp/setup-vm-environment.sh" \
+        --zone="$ZONE" \
+        --project="$PROJECT" \
+        --tunnel-through-iap
+
+    # Run setup
+    gcloud compute ssh "$VM_NAME" \
+        --zone="$ZONE" \
+        --project="$PROJECT" \
+        --tunnel-through-iap \
+        --command="bash /tmp/setup-vm-environment.sh"
+
+    echo ""
+    echo "⏰ Installing auto-shutdown (2hr idle timeout)..."
+
+    # Copy auto-shutdown scripts
+    gcloud compute scp "${SCRIPT_DIR}/scripts/vm-auto-shutdown.sh" \
+        "$VM_NAME:/tmp/vm-auto-shutdown.sh" \
+        --zone="$ZONE" \
+        --project="$PROJECT" \
+        --tunnel-through-iap
+
+    gcloud compute scp "${SCRIPT_DIR}/scripts/install-auto-shutdown.sh" \
+        "$VM_NAME:/tmp/install-auto-shutdown.sh" \
+        --zone="$ZONE" \
+        --project="$PROJECT" \
+        --tunnel-through-iap
+
+    # Install auto-shutdown
+    gcloud compute ssh "$VM_NAME" \
+        --zone="$ZONE" \
+        --project="$PROJECT" \
+        --tunnel-through-iap \
+        --command="bash /tmp/install-auto-shutdown.sh"
+
+    echo ""
+    echo -e "${GREEN}✅ VM created successfully from workstation snapshot!${NC}"
+    echo ""
+    echo "Your development VM is ready:"
+    echo "  Name: $VM_NAME"
+    echo "  Zone: $ZONE"
+    echo "  Data: Copied from $WORKSTATION_DISK"
+    echo ""
+    echo "Next steps:"
+    echo "  1. Start tunnel: vmws tunnel"
+    echo "  2. Open browser: http://localhost:8080"
+    echo "  3. Your files are at: /mnt/home/user/"
+    echo ""
+    echo "Auto-shutdown: VM will stop after 2hr idle (saves money)"
+    echo ""
 }
 
 cmd_init_fresh() {
@@ -425,18 +572,24 @@ cmd_config() {
     if [ "$#" -eq 0 ]; then
         # Interactive configuration
         echo "Current Configuration:"
-        echo "  VM Name: $VM_NAME"
-        echo "  Zone:    $ZONE"
-        echo "  Project: $PROJECT"
+        echo "  VM Name:          $VM_NAME"
+        echo "  Zone:             $ZONE"
+        echo "  Project:          $PROJECT"
+        echo "  Workstation Disk: ${WORKSTATION_DISK:-not set}"
+        echo "  Region:           ${REGION:-not set}"
         echo ""
 
         read -p "VM Name [$VM_NAME]: " new_name
         read -p "Zone [$ZONE]: " new_zone
         read -p "Project [$PROJECT]: " new_project
+        read -p "Workstation Disk [${WORKSTATION_DISK}]: " new_disk
+        read -p "Region [${REGION}]: " new_region
 
         VM_NAME="${new_name:-$VM_NAME}"
         ZONE="${new_zone:-$ZONE}"
         PROJECT="${new_project:-$PROJECT}"
+        WORKSTATION_DISK="${new_disk:-$WORKSTATION_DISK}"
+        REGION="${new_region:-$REGION}"
 
         save_config
         echo -e "${GREEN}✓ Configuration saved${NC}"
@@ -454,6 +607,14 @@ cmd_config() {
                     ;;
                 --project)
                     PROJECT="$2"
+                    shift 2
+                    ;;
+                --workstation-disk)
+                    WORKSTATION_DISK="$2"
+                    shift 2
+                    ;;
+                --region)
+                    REGION="$2"
                     shift 2
                     ;;
                 *)

@@ -61,11 +61,14 @@ chmod +x /usr/local/bin/vmws
 If you have a Cloud Workstation with your projects/configs:
 
 ```bash
-# SSH into your Cloud Workstation
-# Clone this repo there too
+# First, find your workstation disk name
+gcloud compute disks list --filter='name~workstations'
 
-cd vm-workstation-manager
-./bin/vmws create
+# Configure vmws with your workstation disk
+vmws config --workstation-disk workstations-XXXXX --region us-central1
+
+# Create VM from your Mac (no need to SSH into workstation!)
+vmws create
 ```
 
 This will:
