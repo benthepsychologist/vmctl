@@ -3,19 +3,34 @@
 This test replicates the bash workflow from scripts/run-vm-test-workflow.sh
 but uses vmws CLI commands instead of raw gcloud commands.
 
+Features:
+    - TRUE cost calculation based on actual resource usage during test
+    - Customizable machine type and disk size
+    - Automatic Cloud Workstation cost calculation (same VM + $0.20/hour always-on fee)
+    - Automatic resource cleanup
+    - Detailed Markdown report with cost breakdown
+
 Usage:
     # Run as pytest (requires VMWS_INTEGRATION_TESTS=1)
     VMWS_INTEGRATION_TESTS=1 pytest tests/integration/test_vm_workstation_integration.py -v -s
 
-    # Run as standalone script
+    # Run as standalone script with defaults
     python tests/integration/test_vm_workstation_integration.py --workstation-disk disk-name
 
+    # Run with custom VM specs
+    python tests/integration/test_vm_workstation_integration.py \
+      --workstation-disk disk-name \
+      --machine-type n2-standard-4 \
+      --disk-size 500
+
 Environment Variables:
-    VMWS_INTEGRATION_TESTS - Must be set to "1" to run integration tests
-    VMWS_WORKSTATION_DISK - Workstation disk to snapshot (optional)
+    VMWS_INTEGRATION_TESTS - Must be set to "1" to run integration tests (pytest only)
+    VMWS_WORKSTATION_DISK - Workstation disk to snapshot
     VMWS_REGION - GCP region (default: northamerica-northeast1)
     VMWS_ZONE - GCP zone (default: northamerica-northeast1-b)
     VMWS_PROJECT - GCP project ID (uses gcloud default if not set)
+    VMWS_MACHINE_TYPE - VM machine type (default: e2-standard-2)
+    VMWS_DISK_SIZE_GB - Data disk size in GB (default: 200)
 """
 
 import argparse
@@ -39,6 +54,8 @@ class VMWorkstationIntegrationTest:
         zone: str = "northamerica-northeast1-b",
         region: str = "northamerica-northeast1",
         project: str | None = None,
+        machine_type: str = "e2-standard-2",
+        disk_size_gb: int = 200,
     ) -> None:
         """Initialize integration test.
 
@@ -47,11 +64,15 @@ class VMWorkstationIntegrationTest:
             zone: GCP zone
             region: GCP region
             project: GCP project ID (uses gcloud default if None)
+            machine_type: VM machine type (e.g., e2-standard-2, n2-standard-4)
+            disk_size_gb: Data disk size in GB
         """
         self.workstation_disk = workstation_disk
         self.zone = zone
         self.region = region
         self.project = project or self._get_gcloud_project()
+        self.machine_type = machine_type
+        self.disk_size_gb = disk_size_gb
 
         # Generate unique test VM name
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -73,6 +94,10 @@ class VMWorkstationIntegrationTest:
             "disk": False,
             "snapshot": False,
         }
+
+        # Track resource creation times for accurate cost calculation
+        self.resource_creation_times: dict[str, datetime] = {}
+        self.resource_deletion_times: dict[str, datetime] = {}
 
     def _get_gcloud_project(self) -> str:
         """Get default gcloud project."""
@@ -134,6 +159,7 @@ class VMWorkstationIntegrationTest:
         )
 
         self.created_resources["snapshot"] = True
+        self.resource_creation_times["snapshot"] = datetime.now()
         self.report_data["resources"].append({
             "type": "Snapshot",
             "name": self.snapshot_name,
@@ -151,8 +177,8 @@ class VMWorkstationIntegrationTest:
                 "gcloud", "compute", "disks", "create",
                 self.disk_name,
                 f"--source-snapshot={self.snapshot_name}",
-                f"--size=200GB",
-                f"--type=pd-standard",
+                f"--size={self.disk_size_gb}GB",
+                "--type=pd-standard",
                 f"--zone={self.zone}",
                 f"--project={self.project}",
             ],
@@ -160,10 +186,11 @@ class VMWorkstationIntegrationTest:
         )
 
         self.created_resources["disk"] = True
+        self.resource_creation_times["disk"] = datetime.now()
         self.report_data["resources"].append({
             "type": "Disk",
             "name": self.disk_name,
-            "size": "200GB",
+            "size": f"{self.disk_size_gb}GB",
             "zone": self.zone,
         })
 
@@ -187,7 +214,7 @@ class VMWorkstationIntegrationTest:
             [
                 "gcloud", "compute", "instances", "create",
                 self.vm_name,
-                f"--machine-type=e2-standard-2",
+                f"--machine-type={self.machine_type}",
                 f"--zone={self.zone}",
                 f"--project={self.project}",
                 "--image-family=debian-12",
@@ -202,6 +229,7 @@ class VMWorkstationIntegrationTest:
         )
 
         self.created_resources["vm"] = True
+        self.resource_creation_times["vm"] = datetime.now()
 
         # Configure vmws to use this VM
         self._run_command(
@@ -212,7 +240,7 @@ class VMWorkstationIntegrationTest:
         self.report_data["resources"].append({
             "type": "VM Instance",
             "name": self.vm_name,
-            "machine_type": "e2-standard-2",
+            "machine_type": self.machine_type,
             "zone": self.zone,
         })
 
@@ -231,7 +259,7 @@ class VMWorkstationIntegrationTest:
             )
 
             if result.returncode == 0:
-                print(f"   ✅ SSH is ready!")
+                print("   ✅ SSH is ready!")
                 return
 
             if attempt < max_retries:
@@ -357,19 +385,16 @@ class VMWorkstationIntegrationTest:
         end_time = datetime.now()
         duration = (end_time - self.report_data["start_time"]).total_seconds()
 
-        # Calculate costs
-        vm_cost_monthly = 26.28  # e2-standard-2 24/7
-        disk_cost_monthly = 8.00  # 200GB pd-standard
-        total_monthly = vm_cost_monthly + disk_cost_monthly
-
-        workstation_cost = 150.00  # Approximate Cloud Workstation cost
-        savings_percent = ((workstation_cost - total_monthly) / workstation_cost) * 100
+        # Calculate TRUE costs based on actual resource usage
+        costs = self._calculate_actual_costs()
 
         report = f"""# VM Workstation Integration Test Report
 
 **Generated:** {end_time.strftime('%Y-%m-%d %H:%M:%S')}
 **Duration:** {duration:.1f}s ({duration/60:.1f} minutes)
 **VM Name:** `{self.vm_name}`
+**Machine Type:** `{self.machine_type}`
+**Disk Size:** `{self.disk_size_gb}GB`
 **Zone:** `{self.zone}`
 **Project:** `{self.project}`
 
@@ -377,8 +402,9 @@ class VMWorkstationIntegrationTest:
 
 ✅ **Test Status:** {'PASSED' if all(v['passed'] for v in self.report_data['validation_results']) else 'FAILED'}
 📊 **Validation Tests:** {sum(1 for v in self.report_data['validation_results'] if v['passed'])}/{len(self.report_data['validation_results'])} passed
-💰 **Monthly Cost:** ${total_monthly:.2f} (vs ${workstation_cost:.2f} Cloud Workstation)
-💵 **Savings:** {savings_percent:.0f}%
+💵 **Test Cost:** ${costs['test_cost']:.4f} (actual resources used)
+💰 **Monthly Cost (24/7):** ${costs['monthly_24x7']['total']:.2f} vs ${costs['comparison']['workstation_cost']:.2f} Cloud Workstation
+💵 **Savings:** {costs['comparison']['savings_24x7_percent']:.0f}% (${costs['comparison']['savings_24x7']:.2f}/month)
 
 ---
 
@@ -420,19 +446,44 @@ class VMWorkstationIntegrationTest:
 
 ## Cost Analysis
 
-### Monthly Cost Breakdown (24/7 usage)
+### Actual Test Cost Breakdown
 
-- **VM (e2-standard-2):** ${vm_cost_monthly:.2f}/month
-- **Data disk (200GB pd-standard):** ${disk_cost_monthly:.2f}/month
-- **Boot disk (50GB pd-standard):** $2.00/month
-- **Total:** ${total_monthly + 2:.2f}/month
+**Total Test Cost:** ${costs['test_cost']:.4f}
+
+| Resource | Duration | Cost |
+|----------|----------|------|
+| VM ({self.machine_type}) | {costs['durations'].get('vm', 0):.2f} hours | ${costs['cost_breakdown'].get('vm', 0):.4f} |
+| Data Disk ({self.disk_size_gb}GB) | {costs['durations'].get('disk', 0):.2f} hours | ${costs['cost_breakdown'].get('disk', 0):.4f} |
+| Boot Disk (50GB) | {costs['durations'].get('disk', 0):.2f} hours | ${costs['cost_breakdown'].get('boot_disk', 0):.4f} |
+| Snapshot ({self.disk_size_gb}GB) | {costs['durations'].get('snapshot', 0):.2f} hours | ${costs['cost_breakdown'].get('snapshot', 0):.4f} |
+
+*Note: Test costs are based on actual resource creation-to-deletion time.*
+
+### Monthly Cost Breakdown
+
+#### Self-Managed VM (24/7 usage)
+
+- **VM ({self.machine_type}):** ${costs['monthly_24x7']['vm']:.2f}/month
+- **Data disk ({self.disk_size_gb}GB pd-standard):** ${costs['monthly_24x7']['disk']:.2f}/month
+- **Boot disk (50GB pd-standard):** ${costs['monthly_24x7']['boot_disk']:.2f}/month
+- **Total:** ${costs['monthly_24x7']['total']:.2f}/month
+
+#### Cloud Workstation (equivalent specs)
+
+- **VM ({self.machine_type}):** ${costs['workstation']['vm']:.2f}/month
+- **Data disk ({self.disk_size_gb}GB pd-standard):** ${costs['workstation']['disk']:.2f}/month
+- **Boot disk (50GB pd-standard):** ${costs['workstation']['boot_disk']:.2f}/month
+- **Always-on fee ($0.20/hour):** ${costs['workstation']['always_on_fee']:.2f}/month
+- **Total:** ${costs['workstation']['total']:.2f}/month
 
 ### Comparison: Cloud Workstation vs Self-Managed VM
 
 | Scenario | Cloud Workstation | Self-Managed VM | Savings |
 |----------|-------------------|-----------------|---------|
-| 24/7 Usage | ${workstation_cost:.2f}/month | ${total_monthly + 2:.2f}/month | ${workstation_cost - (total_monthly + 2):.2f}/month ({savings_percent:.0f}%) |
-| 8hr/day (auto-shutdown) | ${workstation_cost:.2f}/month | ${(total_monthly + 2) / 3:.2f}/month | ${workstation_cost - (total_monthly + 2) / 3:.2f}/month ({((workstation_cost - (total_monthly + 2) / 3) / workstation_cost) * 100:.0f}%) |
+| 24/7 Usage | ${costs['comparison']['workstation_cost']:.2f}/month | ${costs['monthly_24x7']['total']:.2f}/month | ${costs['comparison']['savings_24x7']:.2f}/month ({costs['comparison']['savings_24x7_percent']:.0f}%) |
+| 8hr/day (auto-shutdown) | ${costs['comparison']['workstation_cost']:.2f}/month | ${costs['monthly_8hr']['total']:.2f}/month | ${costs['comparison']['savings_8hr']:.2f}/month ({costs['comparison']['savings_8hr_percent']:.0f}%) |
+
+*Assumptions: 730 hrs/month for 24/7, 8 hrs/day × 22 working days for 8hr/day scenario.*
 
 ---
 
@@ -489,6 +540,105 @@ gcloud compute snapshots delete {self.snapshot_name} --quiet
         output_path.write_text(report)
         print(f"   📄 Report saved to: {output_path}")
 
+    def _calculate_actual_costs(self) -> dict[str, Any]:
+        """Calculate TRUE costs based on actual resource usage during the test.
+
+        Returns:
+            Dictionary with cost breakdown and comparison
+        """
+        # GCP pricing (as of 2025, subject to change - check cloud.google.com/compute/pricing)
+        # Prices are per hour
+        pricing = {
+            "e2-standard-2": 0.067,      # $0.067/hour
+            "e2-standard-4": 0.134,      # $0.134/hour
+            "n2-standard-2": 0.097,      # $0.097/hour
+            "n2-standard-4": 0.194,      # $0.194/hour
+            "pd-standard-gb": 0.04 / 730,  # $0.04/GB/month = ~$0.0000548/GB/hour
+            "pd-ssd-gb": 0.17 / 730,       # $0.17/GB/month = ~$0.0002329/GB/hour
+            "snapshot-gb": 0.026 / 730,    # $0.026/GB/month = ~$0.0000356/GB/hour
+        }
+
+        # Get machine type pricing (default to e2-standard-2 if not found)
+        vm_hourly_rate = pricing.get(self.machine_type, pricing["e2-standard-2"])
+
+        # Calculate duration for each resource (in hours)
+        costs: dict[str, float] = {}
+        durations: dict[str, float] = {}
+
+        for resource in ["vm", "disk", "snapshot"]:
+            if resource in self.resource_creation_times and resource in self.resource_deletion_times:
+                duration_seconds = (
+                    self.resource_deletion_times[resource] - self.resource_creation_times[resource]
+                ).total_seconds()
+                durations[resource] = duration_seconds / 3600.0  # Convert to hours
+
+        # Calculate costs
+        if "vm" in durations:
+            costs["vm"] = durations["vm"] * vm_hourly_rate
+
+        if "disk" in durations:
+            costs["disk"] = durations["disk"] * self.disk_size_gb * pricing["pd-standard-gb"]
+            costs["boot_disk"] = durations["disk"] * 50 * pricing["pd-standard-gb"]  # 50GB boot disk
+
+        if "snapshot" in durations:
+            costs["snapshot"] = durations["snapshot"] * self.disk_size_gb * pricing["snapshot-gb"]
+
+        # Calculate total test cost
+        total_test_cost = sum(costs.values())
+
+        # Calculate monthly costs (for comparison)
+        vm_monthly = vm_hourly_rate * 730  # 730 hours/month average
+        disk_monthly = self.disk_size_gb * 0.04  # $0.04/GB/month
+        boot_disk_monthly = 50 * 0.04
+        total_monthly = vm_monthly + disk_monthly + boot_disk_monthly
+
+        # Calculate Cloud Workstation cost (same VM + $0.20/hour always-on fee)
+        workstation_always_on_fee = 0.20 * 730  # $0.20/hour * 730 hours/month = $146/month
+        workstation_monthly_cost = vm_monthly + disk_monthly + boot_disk_monthly + workstation_always_on_fee
+
+        # Calculate savings vs Cloud Workstation
+        savings_monthly = workstation_monthly_cost - total_monthly
+        savings_percent = (savings_monthly / workstation_monthly_cost) * 100
+
+        # Calculate 8hr/day scenario (auto-shutdown)
+        vm_8hr_monthly = vm_hourly_rate * 8 * 22  # 8 hours/day, 22 working days/month
+        total_8hr_monthly = vm_8hr_monthly + disk_monthly + boot_disk_monthly
+        savings_8hr_monthly = workstation_monthly_cost - total_8hr_monthly
+        savings_8hr_percent = (savings_8hr_monthly / workstation_monthly_cost) * 100
+
+        return {
+            "test_cost": total_test_cost,
+            "test_duration_hours": sum(durations.values()) / len(durations) if durations else 0,
+            "cost_breakdown": costs,
+            "durations": durations,
+            "monthly_24x7": {
+                "vm": vm_monthly,
+                "disk": disk_monthly,
+                "boot_disk": boot_disk_monthly,
+                "total": total_monthly,
+            },
+            "monthly_8hr": {
+                "vm": vm_8hr_monthly,
+                "disk": disk_monthly,
+                "boot_disk": boot_disk_monthly,
+                "total": total_8hr_monthly,
+            },
+            "workstation": {
+                "vm": vm_monthly,
+                "disk": disk_monthly,
+                "boot_disk": boot_disk_monthly,
+                "always_on_fee": workstation_always_on_fee,
+                "total": workstation_monthly_cost,
+            },
+            "comparison": {
+                "workstation_cost": workstation_monthly_cost,
+                "savings_24x7": savings_monthly,
+                "savings_24x7_percent": savings_percent,
+                "savings_8hr": savings_8hr_monthly,
+                "savings_8hr_percent": savings_8hr_percent,
+            },
+        }
+
     def cleanup(self) -> None:
         """Clean up all created resources."""
         print("\n" + "="*80)
@@ -502,6 +652,7 @@ gcloud compute snapshots delete {self.snapshot_name} --quiet
                 f"Deleting VM {self.vm_name}",
                 check=False,
             )
+            self.resource_deletion_times["vm"] = datetime.now()
 
         # Delete disk
         if self.created_resources["disk"]:
@@ -516,6 +667,7 @@ gcloud compute snapshots delete {self.snapshot_name} --quiet
                 f"Deleting disk {self.disk_name}",
                 check=False,
             )
+            self.resource_deletion_times["disk"] = datetime.now()
 
         # Delete snapshot
         if self.created_resources["snapshot"]:
@@ -529,6 +681,7 @@ gcloud compute snapshots delete {self.snapshot_name} --quiet
                 f"Deleting snapshot {self.snapshot_name}",
                 check=False,
             )
+            self.resource_deletion_times["snapshot"] = datetime.now()
 
     def run(self, cleanup_on_completion: bool = True) -> Path:
         """Run the complete integration test workflow.
@@ -591,12 +744,18 @@ def test_vm_workstation_integration() -> None:
     region = os.getenv("VMWS_REGION", "northamerica-northeast1")
     project = os.getenv("VMWS_PROJECT")
 
+    # Get customizable test parameters
+    machine_type = os.getenv("VMWS_MACHINE_TYPE", "e2-standard-2")
+    disk_size_gb = int(os.getenv("VMWS_DISK_SIZE_GB", "200"))
+
     # Run integration test
     test = VMWorkstationIntegrationTest(
         workstation_disk=workstation_disk,
         zone=zone,
         region=region,
         project=project,
+        machine_type=machine_type,
+        disk_size_gb=disk_size_gb,
     )
 
     report_path = test.run(cleanup_on_completion=True)
@@ -611,12 +770,64 @@ def test_vm_workstation_integration() -> None:
 
 def main() -> int:
     """Run as standalone script."""
-    parser = argparse.ArgumentParser(description="VM Workstation Integration Test")
-    parser.add_argument("--workstation-disk", required=True, help="Workstation disk to snapshot")
-    parser.add_argument("--zone", default="northamerica-northeast1-b", help="GCP zone")
-    parser.add_argument("--region", default="northamerica-northeast1", help="GCP region")
-    parser.add_argument("--project", help="GCP project ID (uses gcloud default if not set)")
-    parser.add_argument("--no-cleanup", action="store_true", help="Don't cleanup resources after test")
+    parser = argparse.ArgumentParser(
+        description="VM Workstation Integration Test - Create, validate, and cost-compare self-managed VMs",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Basic test with defaults (e2-standard-2, 200GB)
+  python test_vm_workstation_integration.py --workstation-disk workstations-DISK-ID
+
+  # Test with larger VM and disk
+  python test_vm_workstation_integration.py \\
+    --workstation-disk workstations-DISK-ID \\
+    --machine-type n2-standard-4 \\
+    --disk-size 500
+
+Environment variables can also be used:
+  VMWS_WORKSTATION_DISK, VMWS_ZONE, VMWS_REGION, VMWS_PROJECT,
+  VMWS_MACHINE_TYPE, VMWS_DISK_SIZE_GB
+
+Note: Cloud Workstation cost is calculated automatically based on VM specs
+      (same compute + $0.20/hour always-on fee = $146/month extra).
+        """,
+    )
+
+    parser.add_argument(
+        "--workstation-disk",
+        required=True,
+        help="Workstation disk to snapshot (e.g., workstations-4f92986b-...)",
+    )
+    parser.add_argument(
+        "--zone",
+        default="northamerica-northeast1-b",
+        help="GCP zone (default: northamerica-northeast1-b)",
+    )
+    parser.add_argument(
+        "--region",
+        default="northamerica-northeast1",
+        help="GCP region (default: northamerica-northeast1)",
+    )
+    parser.add_argument(
+        "--project",
+        help="GCP project ID (uses gcloud default if not set)",
+    )
+    parser.add_argument(
+        "--machine-type",
+        default="e2-standard-2",
+        help="VM machine type (default: e2-standard-2). Examples: e2-standard-4, n2-standard-2, n2-standard-4",
+    )
+    parser.add_argument(
+        "--disk-size",
+        type=int,
+        default=200,
+        help="Data disk size in GB (default: 200)",
+    )
+    parser.add_argument(
+        "--no-cleanup",
+        action="store_true",
+        help="Don't cleanup resources after test (for inspection/debugging)",
+    )
 
     args = parser.parse_args()
 
@@ -625,6 +836,8 @@ def main() -> int:
         zone=args.zone,
         region=args.region,
         project=args.project,
+        machine_type=args.machine_type,
+        disk_size_gb=args.disk_size,
     )
 
     try:

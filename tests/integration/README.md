@@ -51,9 +51,15 @@ pytest tests/integration/test_vm_workstation_integration.py -v -s
 ### Method 2: Run as standalone script
 
 ```bash
-# Run with automatic cleanup
+# Basic test with defaults (e2-standard-2, 200GB)
 python tests/integration/test_vm_workstation_integration.py \
   --workstation-disk workstations-YOUR-DISK-ID
+
+# Test with larger VM and disk
+python tests/integration/test_vm_workstation_integration.py \
+  --workstation-disk workstations-YOUR-DISK-ID \
+  --machine-type n2-standard-4 \
+  --disk-size 500
 
 # Run without cleanup (to inspect resources)
 python tests/integration/test_vm_workstation_integration.py \
@@ -76,6 +82,10 @@ python tests/integration/test_vm_workstation_integration.py \
 | `VMWS_ZONE` | No | northamerica-northeast1-b | GCP zone |
 | `VMWS_REGION` | No | northamerica-northeast1 | GCP region |
 | `VMWS_PROJECT` | No | gcloud default | GCP project ID |
+| `VMWS_MACHINE_TYPE` | No | e2-standard-2 | VM machine type (e2-standard-4, n2-standard-2, etc.) |
+| `VMWS_DISK_SIZE_GB` | No | 200 | Data disk size in GB |
+
+**Note:** Cloud Workstation cost is calculated automatically based on your VM specs (same compute + $0.20/hour always-on fee = $146/month extra).
 
 ## What The Test Does
 
@@ -111,10 +121,13 @@ The test generates a detailed Markdown report:
 
 The report includes:
 - Executive summary with pass/fail status
+- **Actual test cost breakdown** (TRUE cost based on resource duration)
 - Resource creation details
 - Step-by-step workflow results
 - Validation test results
-- Cost analysis and savings comparison
+- **Personalized cost analysis** (using your machine type, disk size, and workstation cost)
+- Monthly cost projections (24/7 and 8hr/day scenarios)
+- Savings comparison vs Cloud Workstation
 - Access instructions
 - Cleanup instructions
 
