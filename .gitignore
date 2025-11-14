@@ -6,6 +6,7 @@
 .vscode/
 .idea/
 vm-test-report-*.md
+vm-integration-test-report-*.md
 
 # Python
 __pycache__/

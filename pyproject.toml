@@ -67,6 +67,9 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
+markers = [
+    "integration: mark test as integration test (creates real GCP resources)",
+]
 
 [tool.mypy]
 python_version = "3.12"
