@@ -556,7 +556,7 @@ cmd_tunnel() {
 
     echo -e "${GREEN}Starting IAP tunnel to code-server...${NC}"
     echo ""
-    echo "Visit: ${BLUE}http://localhost:8080${NC}"
+    echo -e "Visit: ${BLUE}http://localhost:8080${NC}"
     echo "Press Ctrl+C to stop the tunnel"
     echo ""
 

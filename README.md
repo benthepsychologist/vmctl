@@ -389,22 +389,25 @@ vm-workstation-manager/
 
 ## Troubleshooting
 
-### VM won't start
+See **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** for detailed solutions to common issues:
+
+- Cannot connect to code-server (Connection refused)
+- VM already exists error
+- Git conflicts when upgrading
+- SSH connection issues
+- Auto-shutdown not working
+- Docker permission denied
+
+Quick fixes:
 ```bash
+# Check status
 vmws status
-gcloud compute instances describe <vm-name> --zone=<zone>
-```
-
-### Can't connect to code-server
-```bash
-vmws ssh
-sudo systemctl status code-server
-sudo systemctl restart code-server
-```
-
-### Auto-shutdown not working
-```bash
 vmws logs
+
+# Fix code-server permissions (common issue)
+vmws ssh
+sudo chown -R $USER:$USER /mnt/home/user
+sudo systemctl restart code-server
 ```
 
 ## Migration Guide
@@ -451,6 +454,7 @@ A: Yes. Use `vmws config --vm-name dev-vm-2` to manage different VMs.
 ## Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** - Get started in 10 minutes
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Deep dive into how it works
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development guide
 - **[docs/VM-AUTOMATION-GUIDE.md](docs/VM-AUTOMATION-GUIDE.md)** - Detailed usage guide

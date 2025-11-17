@@ -51,6 +51,12 @@ auth: none
 cert: false
 EOF
 
+# Fix ownership of /mnt/home/user if it exists (for migrated workstations)
+if [ -d "/mnt/home/user" ]; then
+    echo "🔧 Fixing ownership of /mnt/home/user for current user..."
+    sudo chown -R $USER:$USER /mnt/home/user
+fi
+
 # Create systemd service for code-server
 sudo tee /etc/systemd/system/code-server.service > /dev/null <<EOF
 [Unit]
