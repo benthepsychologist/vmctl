@@ -346,7 +346,7 @@ If you're still stuck:
    - Permission issues (ownership, file permissions)
    - Network issues (firewall, IAP)
 
-3. **Search GitHub issues:** https://github.com/benthepsychologist/vm-workstation-manager/issues
+3. **Search GitHub issues:** https://github.com/benthepsychologist/codestation/issues
 
 4. **Use Claude locally with this documentation** - the error messages are usually clear enough to diagnose with AI assistance
 

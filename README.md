@@ -1,12 +1,12 @@
-# VM Workstation Manager
+# Codestation
 
 > Replace Google Cloud Workstations with self-managed VMs and save **$91-124/month**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Bash](https://img.shields.io/badge/bash-%23121011.svg?style=flat&logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
+[![Python](https://img.shields.io/badge/python-3.12+-blue.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
 [![Google Cloud](https://img.shields.io/badge/Google%20Cloud-%234285F4.svg?style=flat&logo=google-cloud&logoColor=white)](https://cloud.google.com)
 
-A simple CLI tool to manage self-hosted development VMs as drop-in replacements for Google Cloud Workstations.
+A modern Python CLI tool to manage self-hosted development VMs as drop-in replacements for Google Cloud Workstations.
 
 **💰 Save 61-83% on cloud development costs**
 
@@ -15,10 +15,10 @@ A simple CLI tool to manage self-hosted development VMs as drop-in replacements 
 This tool runs **entirely from your local machine** (Mac/Linux). No need to SSH into Cloud Workstations.
 
 **Simple workflow:**
-1. Install `vmws` CLI on your Mac
-2. Configure once: `vmws config`
-3. Create VM: `vmws create` or `vmws init-fresh`
-4. Daily use: `vmws start` → `vmws tunnel` → code in browser
+1. Install `cstation` CLI on your Mac
+2. Configure once: `cstation config`
+3. Create VM: `cstation create` or `cstation init-fresh`
+4. Daily use: `cstation start` → `cstation tunnel` → code in browser
 5. Save money: VM auto-stops after 2hr idle
 
 **Under the hood:**
@@ -43,10 +43,10 @@ This tool runs **entirely from your local machine** (Mac/Linux). No need to SSH 
 
 ✅ **Simple CLI interface**
 ```bash
-vmws create   # Create VM from workstation
-vmws start    # Start VM
-vmws tunnel   # Connect to code-server
-vmws stop     # Stop VM
+cstation create   # Create VM from workstation
+cstation start    # Start VM
+cstation tunnel   # Connect to code-server
+cstation stop     # Stop VM
 ```
 
 ## Two Ways to Use This
@@ -67,10 +67,29 @@ Create a brand new development VM with Docker, code-server, and neovim pre-insta
 
 ### 1. Install (on your local machine)
 
+**Option A: Python Package (Recommended)**
+
+```bash
+# Prerequisites: Python 3.12+, gcloud CLI
+python3 --version  # Check version
+
+# Clone the repo
+git clone https://github.com/benthepsychologist/codestation.git
+cd codestation
+
+# Install with pip
+pip install -e .
+
+# Verify installation
+cstation --version
+```
+
+**Option B: Bash Script (Legacy)**
+
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/vm-workstation-manager.git
-cd vm-workstation-manager
+git clone https://github.com/benthepsychologist/codestation.git
+cd codestation
 
 # Install CLI
 ./bin/vmws install
@@ -79,6 +98,8 @@ cd vm-workstation-manager
 cp bin/vmws /usr/local/bin/vmws
 chmod +x /usr/local/bin/vmws
 ```
+
+See [MIGRATION.md](MIGRATION.md) for details on the Python version and migration guide.
 
 ### 2a. Create VM - Migrate from Cloud Workstation
 
@@ -89,15 +110,15 @@ chmod +x /usr/local/bin/vmws
 gcloud compute disks list --filter='name~workstations'
 # Look for: workstations-XXXXX (in your workstation's region)
 
-# Step 2: Configure vmws with the disk info
-vmws config \
+# Step 2: Configure cstation with the disk info
+cstation config \
   --workstation-disk workstations-XXXXX \
   --region northamerica-northeast1 \
   --zone northamerica-northeast1-b \
   --vm-name my-dev-vm
 
 # Step 3: Create the VM (runs remotely via gcloud)
-vmws create
+cstation create
 ```
 
 **What happens:**
@@ -126,12 +147,12 @@ vmws create
 
 ```bash
 # Configure your VM settings
-vmws config \
+cstation config \
   --vm-name my-dev-vm \
   --zone us-central1-a
 
 # Create fresh VM
-vmws init-fresh
+cstation init-fresh
 ```
 
 **What happens:**
@@ -160,23 +181,23 @@ vmws init-fresh
 
 ```bash
 # Start your VM (takes ~30 seconds)
-vmws start
+cstation start
 
 # Open tunnel to code-server (web-based VS Code)
-vmws tunnel
+cstation tunnel
 # Then visit: http://localhost:8080 in your browser
 
 # Or SSH into the VM
-vmws ssh
+cstation ssh
 
 # Check if VM is running
-vmws status
+cstation status
 
 # Stop VM when done (save money)
-vmws stop
+cstation stop
 
 # View auto-shutdown logs
-vmws logs
+cstation logs
 ```
 
 **Key point:** Your VM auto-stops after 2 hours of idle time, so you only pay for compute when actively using it!
@@ -185,31 +206,31 @@ vmws logs
 
 | Command | Description |
 |---------|-------------|
-| `vmws create` | Create VM from workstation (run from workstation) |
-| `vmws init-fresh` | Create VM from scratch (no workstation needed) |
-| `vmws start` | Start stopped VM |
-| `vmws stop` | Stop VM to save money |
-| `vmws status` | Show VM status |
-| `vmws connect` / `vmws ssh` | SSH into VM |
-| `vmws tunnel` | Start IAP tunnel to code-server |
-| `vmws logs` | View auto-shutdown logs |
-| `vmws backup` | Create incremental snapshot of data disk |
-| `vmws snapshots` | List all snapshots |
-| `vmws restore <snapshot>` | Restore VM from snapshot |
-| `vmws config` | Configure VM name/zone/project |
-| `vmws delete` | Delete VM and all resources |
-| `vmws install` | Install CLI on local machine |
+| `cstation create` | Create VM from workstation (run from workstation) |
+| `cstation init-fresh` | Create VM from scratch (no workstation needed) |
+| `cstation start` | Start stopped VM |
+| `cstation stop` | Stop VM to save money |
+| `cstation status` | Show VM status |
+| `cstation connect` / `cstation ssh` | SSH into VM |
+| `cstation tunnel` | Start IAP tunnel to code-server |
+| `cstation logs` | View auto-shutdown logs |
+| `cstation backup` | Create incremental snapshot of data disk |
+| `cstation snapshots` | List all snapshots |
+| `cstation restore <snapshot>` | Restore VM from snapshot |
+| `cstation config` | Configure VM name/zone/project |
+| `cstation delete` | Delete VM and all resources |
+| `cstation install` | Install CLI on local machine |
 
 ## Configuration
 
 ```bash
 # Interactive
-vmws config
+cstation config
 
 # Or specify directly
-vmws config --vm-name my-dev-vm --zone us-central1-a --project my-project
+cstation config --vm-name my-dev-vm --zone us-central1-a --project my-project
 
-# Config stored at: ~/.vmws/config
+# Config stored at: ~/.codestation/config
 ```
 
 ## Cost Breakdown
@@ -238,13 +259,13 @@ vmws config --vm-name my-dev-vm --zone us-central1-a --project my-project
 
 ```bash
 # Create a backup (incremental, only changed blocks)
-vmws backup
+cstation backup
 
 # List all backups
-vmws snapshots
+cstation snapshots
 
 # Restore from a backup if something breaks
-vmws restore dev-workstation-backup-20251125-140530
+cstation restore dev-workstation-backup-20251125-140530
 ```
 
 **Why snapshots?**
@@ -270,7 +291,7 @@ Tracks:
 
 **Adjust timeout:**
 ```bash
-vmws ssh
+cstation ssh
 sudo vim /usr/local/bin/vm-auto-shutdown.sh
 # Change IDLE_TIMEOUT_MINUTES=120
 sudo systemctl restart vm-auto-shutdown
@@ -297,8 +318,8 @@ sudo systemctl restart vm-auto-shutdown
 ┌─────────────────────────┐
 │   Local Machine (Mac)   │
 │                         │
-│   $ vmws start          │
-│   $ vmws tunnel         │
+│   $ cstation start      │
+│   $ cstation tunnel     │
 └───────────┬─────────────┘
             │
             │ IAP Tunnel
@@ -333,8 +354,8 @@ sudo systemctl restart vm-auto-shutdown
 | **Web IDE** | ✅ Code OSS | ✅ code-server |
 | **Docker** | ✅ | ✅ |
 | **IAP Auth** | ✅ | ✅ |
-| **Start method** | Click in console | `vmws start` |
-| **Connect** | Click "Open" | `vmws tunnel` |
+| **Start method** | Click in console | `cstation start` |
+| **Connect** | Click "Open" | `cstation tunnel` |
 | **Updates** | Google manages | You manage |
 | **Setup time** | Instant | 6 min (one-time) |
 
@@ -342,17 +363,17 @@ sudo systemctl restart vm-auto-shutdown
 
 ```bash
 # Morning: Start your dev environment
-vmws start
+cstation start
 
 # Open web IDE
-vmws tunnel &
+cstation tunnel &
 open http://localhost:8080
 
 # Work on your code
 # VM auto-shuts down after 2hrs if idle
 
 # Or stop manually when done
-vmws stop
+cstation stop
 ```
 
 ## Files Structure
@@ -360,7 +381,7 @@ vmws stop
 ```
 vm-workstation-manager/
 ├── bin/
-│   └── vmws                        # Main CLI tool
+│   └── vmws                        # Legacy bash CLI (deprecated)
 ├── scripts/
 │   ├── run-vm-test-workflow.sh     # Create VM workflow
 │   ├── create-test-vm.sh           # Create VM only
@@ -401,11 +422,11 @@ See **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** for detailed solutions to commo
 Quick fixes:
 ```bash
 # Check status
-vmws status
-vmws logs
+cstation status
+cstation logs
 
 # Fix code-server permissions (common issue)
-vmws ssh
+cstation ssh
 sudo chown -R $USER:$USER /mnt/home/user
 sudo systemctl restart code-server
 ```
@@ -416,12 +437,12 @@ sudo systemctl restart code-server
 
 1. **Test the VM** (keep both running)
    ```bash
-   # On workstation
-   vmws create
-
    # On local machine
-   vmws start
-   vmws tunnel
+   cstation create
+
+   # Start and connect
+   cstation start
+   cstation tunnel
    ```
 
 2. **Validate** (use VM for a few days)
@@ -440,7 +461,7 @@ sudo systemctl restart code-server
 A: Yes. Uses IAP (Identity-Aware Proxy) with same Google Cloud SSO as workstations. No public IPs exposed.
 
 **Q: What if my VM shuts down?**
-A: Just run `vmws start`. Takes ~30 seconds.
+A: Just run `cstation start`. Takes ~30 seconds.
 
 **Q: Can I use a different machine type?**
 A: Yes. Edit `scripts/create-test-vm.sh` and change `MACHINE_TYPE`.
@@ -449,20 +470,26 @@ A: Yes. Edit `scripts/create-test-vm.sh` and change `MACHINE_TYPE`.
 A: Your data is on a persistent disk. Create snapshots regularly with `gcloud compute disks snapshot`.
 
 **Q: Can I run multiple VMs?**
-A: Yes. Use `vmws config --vm-name dev-vm-2` to manage different VMs.
+A: Yes. Use `cstation config --vm-name dev-vm-2` to manage different VMs.
 
 ## Documentation
 
-- **[QUICKSTART.md](QUICKSTART.md)** - Get started in 10 minutes
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Deep dive into how it works
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development guide
-- **[docs/VM-AUTOMATION-GUIDE.md](docs/VM-AUTOMATION-GUIDE.md)** - Detailed usage guide
-- **[examples/custom-config.sh](examples/custom-config.sh)** - Customization examples
+📚 **[Complete Documentation →](docs/README.md)**
+
+**User Guides:**
+- **[Quick Start](docs/guides/QUICKSTART.md)** - Get started in 10 minutes
+- **[Migration Guide](docs/guides/MIGRATION.md)** - Upgrade to v3.0, migrate from Cloud Workstations
+- **[Troubleshooting](docs/guides/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Known Issues](docs/guides/KNOWN-ISSUES.md)** - Current limitations
+
+**Developer Docs:**
+- **[Contributing](docs/development/CONTRIBUTING.md)** - Development setup and guidelines
+- **[Architecture](docs/development/ARCHITECTURE.md)** - Technical deep dive
+- **[Release Process](docs/development/RELEASE.md)** - How to create releases
 
 ## Contributing
 
-Pull requests welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+Pull requests welcome! See [docs/development/CONTRIBUTING.md](docs/development/CONTRIBUTING.md) for:
 - Code structure explanation
 - How to make changes
 - Testing guidelines
@@ -474,7 +501,7 @@ MIT License - see [LICENSE](LICENSE) file
 
 ## Support
 
-- **Issues:** [Report bugs or request features](https://github.com/benthepsychologist/vm-workstation-manager/issues)
+- **Issues:** [Report bugs or request features](https://github.com/benthepsychologist/codestation/issues)
 - **Discussions:** Ask questions or share tips
 - **Pull Requests:** Contributions welcome!
 
@@ -507,10 +534,10 @@ Built with:
 **Save $91-124/month. Start today.**
 
 ```bash
-git clone https://github.com/benthepsychologist/vm-workstation-manager.git
-cd vm-workstation-manager
+git clone https://github.com/benthepsychologist/codestation.git
+cd codestation
 ./install.sh
-vmws create
+cstation create
 ```
 
 **Star ⭐ this repo if it helps you!**

@@ -3,8 +3,8 @@
 import pytest
 from click.testing import CliRunner
 
-from vmws import __version__
-from vmws.cli.main import cli
+from codestation import __version__
+from codestation.cli.main import cli
 
 
 class TestCLIMain:
@@ -19,7 +19,7 @@ class TestCLIMain:
         """Test CLI help message."""
         result = runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
-        assert "VM Workstation Manager" in result.output
+        assert "Codestation" in result.output
         assert "Save 61-83%" in result.output
         assert "Quick Start" in result.output
 
@@ -28,7 +28,7 @@ class TestCLIMain:
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
         assert __version__ in result.output
-        assert "vmws" in result.output
+        assert "cstation" in result.output
 
     def test_cli_has_create_command(self, runner: CliRunner) -> None:
         """Test create command is registered."""

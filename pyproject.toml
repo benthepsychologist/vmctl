@@ -3,16 +3,16 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vm-workstation-manager"
-version = "2.0.0"
-description = "Self-managed development VMs as drop-in replacements for Google Cloud Workstations"
+name = "codestation"
+version = "3.0.0"
+description = "Codestation - Self-managed development environments on Google Cloud"
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
     {name = "benthepsychologist", email = "ben@example.com"}
 ]
-keywords = ["gcp", "cloud", "development", "vm", "workstation", "cli"]
+keywords = ["codestation", "gcp", "cloud", "development", "coding", "devenv", "cli"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -28,6 +28,7 @@ dependencies = [
     "rich>=13.7.0",
     "pyyaml>=6.0",
     "pydantic>=2.0.0",
+    "google-cloud-compute>=1.15.0",
 ]
 
 [project.optional-dependencies]
@@ -43,12 +44,13 @@ dev = [
 ]
 
 [project.scripts]
-vmws = "vmws.cli.main:cli"
+cstation = "codestation.cli.main:cli"
+vmws = "codestation.cli.compat:vmws_compat"
 
 [project.urls]
-Homepage = "https://github.com/benthepsychologist/vm-workstation-manager"
-Issues = "https://github.com/benthepsychologist/vm-workstation-manager/issues"
-Repository = "https://github.com/benthepsychologist/vm-workstation-manager"
+Homepage = "https://github.com/benthepsychologist/codestation"
+Issues = "https://github.com/benthepsychologist/codestation/issues"
+Repository = "https://github.com/benthepsychologist/codestation"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -63,7 +65,7 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
     "--verbose",
-    "--cov=src/vmws",
+    "--cov=src/codestation",
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
@@ -77,7 +79,7 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 strict = true
-files = ["src/vmws", "tests"]
+files = ["src/codestation", "tests"]
 
 [tool.ruff]
 target-version = "py312"
@@ -100,7 +102,7 @@ ignore = []
 "tests/integration/*" = ["E501"]  # Allow long lines in integration tests (commands, markdown templates)
 
 [tool.coverage.run]
-source = ["src/vmws"]
+source = ["src/codestation"]
 omit = ["*/tests/*", "*/__init__.py"]
 
 [tool.coverage.report]

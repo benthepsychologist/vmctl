@@ -4,9 +4,9 @@ from datetime import datetime
 
 from rich.console import Console
 
-from vmws.config.models import VMConfig
-from vmws.core.exceptions import DiskError
-from vmws.utils.subprocess_runner import run_command
+from codestation.config.models import VMConfig
+from codestation.core.exceptions import DiskError
+from codestation.utils.subprocess_runner import run_command
 
 console = Console()
 
@@ -120,7 +120,7 @@ class DiskManager:
 
         try:
             # Import here to avoid circular dependency
-            from vmws.core.vm import VMManager
+            from codestation.core.vm import VMManager
 
             vm = VMManager(self.config)
 

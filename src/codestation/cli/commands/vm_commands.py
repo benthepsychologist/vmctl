@@ -3,10 +3,10 @@
 import click
 from rich.console import Console
 
-from vmws.config.manager import ConfigManager
-from vmws.core.exceptions import VMError
-from vmws.core.tunnel import TunnelManager
-from vmws.core.vm import VMManager
+from codestation.config.manager import ConfigManager
+from codestation.core.exceptions import VMError
+from codestation.core.tunnel import TunnelManager
+from codestation.core.vm import VMManager
 
 console = Console()
 
@@ -27,7 +27,7 @@ def create() -> None:
     console.print("[red]⚠ The 'create' command is not yet implemented in Python version.[/red]")
     console.print("[yellow]This command will create a VM from an existing Cloud Workstation.[/yellow]")
     console.print("\nPlease use the bash version: [blue]bin/vmws create[/blue]")
-    console.print("\nOr use: [green]vmws init-fresh[/green] to create a fresh VM without a workstation.")
+    console.print("\nOr use: [green]cstation init-fresh[/green] to create a fresh VM without a workstation.")
 
 
 @click.command(name="init-fresh")
@@ -55,15 +55,15 @@ def start() -> None:
         config = config_mgr.load()
 
         if not config_mgr.config_exists():
-            console.print("[red]No configuration found. Run 'vmws config' first.[/red]")
-            raise click.Abort()
+            console.print("[red]No configuration found. Run 'cstation config' first.[/red]")
+            raise click.Abort() from None
 
         vm = VMManager(config)
 
         if not vm.exists():
             console.print(f"[red]VM {config.vm_name} does not exist.[/red]")
-            console.print("[yellow]Create it first with 'vmws create' or 'vmws init-fresh'[/yellow]")
-            raise click.Abort()
+            console.print("[yellow]Create it first with 'cstation create' or 'cstation init-fresh'[/yellow]")
+            raise click.Abort() from None
 
         status = vm.status()
         if status == "RUNNING":
@@ -73,7 +73,7 @@ def start() -> None:
 
     except VMError as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise click.Abort()
+        raise click.Abort() from None
 
 
 @click.command()
@@ -87,7 +87,7 @@ def stop() -> None:
 
         if not vm.exists():
             console.print(f"[red]VM {config.vm_name} does not exist.[/red]")
-            raise click.Abort()
+            raise click.Abort() from None
 
         status = vm.status()
         if status == "TERMINATED":
@@ -97,7 +97,7 @@ def stop() -> None:
 
     except VMError as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise click.Abort()
+        raise click.Abort() from None
 
 
 @click.command()
@@ -108,14 +108,14 @@ def status() -> None:
         config = config_mgr.load()
 
         if not config_mgr.config_exists():
-            console.print("[yellow]No configuration found. Run 'vmws config' first.[/yellow]")
+            console.print("[yellow]No configuration found. Run 'cstation config' first.[/yellow]")
             return
 
         vm = VMManager(config)
 
         if not vm.exists():
             console.print(f"[red]VM {config.vm_name} does not exist[/red]")
-            console.print("[dim]Create it with 'vmws create' or 'vmws init-fresh'[/dim]")
+            console.print("[dim]Create it with 'cstation create' or 'cstation init-fresh'[/dim]")
             return
 
         vm_status = vm.status()
@@ -131,12 +131,12 @@ def status() -> None:
         # Show connection info if running
         if vm_status == "RUNNING":
             console.print("\n[dim]Connect with:[/dim]")
-            console.print("  [blue]vmws tunnel[/blue]  → Open code-server")
-            console.print("  [blue]vmws ssh[/blue]     → SSH into VM")
+            console.print("  [blue]cstation tunnel[/blue]  → Open code-server")
+            console.print("  [blue]cstation ssh[/blue]     → SSH into VM")
 
     except VMError as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise click.Abort()
+        raise click.Abort() from None
 
 
 @click.command()
@@ -156,8 +156,8 @@ def ssh(command: str | None) -> None:
     COMMAND: Optional command to run (if omitted, opens interactive shell)
 
     Examples:
-        vmws ssh              # Interactive shell
-        vmws ssh "ls -la"     # Run command
+        cstation ssh              # Interactive shell
+        cstation ssh "ls -la"     # Run command
     """
     try:
         config_mgr = ConfigManager()
@@ -167,19 +167,19 @@ def ssh(command: str | None) -> None:
 
         if not vm.exists():
             console.print(f"[red]VM {config.vm_name} does not exist.[/red]")
-            raise click.Abort()
+            raise click.Abort() from None
 
         vm_status = vm.status()
         if vm_status != "RUNNING":
-            console.print(f"[red]VM is {vm_status}. Start it with 'vmws start'[/red]")
-            raise click.Abort()
+            console.print(f"[red]VM is {vm_status}. Start it with 'cstation start'[/red]")
+            raise click.Abort() from None
 
         console.print(f"[blue]Connecting to {config.vm_name}...[/blue]")
         vm.ssh(command)
 
     except VMError as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise click.Abort()
+        raise click.Abort() from None
 
 
 @click.command()
@@ -200,19 +200,19 @@ def tunnel(port: int) -> None:
 
         if not vm.exists():
             console.print(f"[red]VM {config.vm_name} does not exist.[/red]")
-            raise click.Abort()
+            raise click.Abort() from None
 
         vm_status = vm.status()
         if vm_status != "RUNNING":
-            console.print(f"[red]VM is {vm_status}. Start it with 'vmws start'[/red]")
-            raise click.Abort()
+            console.print(f"[red]VM is {vm_status}. Start it with 'cstation start'[/red]")
+            raise click.Abort() from None
 
         tunnel_mgr = TunnelManager(config, local_port=port)
         tunnel_mgr.start(background=False)
 
     except VMError as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise click.Abort()
+        raise click.Abort() from None
     except KeyboardInterrupt:
         console.print("\n[yellow]Tunnel stopped[/yellow]")
 
@@ -229,7 +229,7 @@ def logs(file: str) -> None:
 
         if not vm.exists():
             console.print(f"[red]VM {config.vm_name} does not exist.[/red]")
-            raise click.Abort()
+            raise click.Abort() from None
 
         console.print(f"[blue]Fetching logs from {file}...[/blue]")
         log_content = vm.logs(file)
@@ -238,7 +238,7 @@ def logs(file: str) -> None:
 
     except VMError as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise click.Abort()
+        raise click.Abort() from None
 
 
 @click.command()
@@ -269,4 +269,4 @@ def delete(yes: bool) -> None:
 
     except VMError as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise click.Abort()
+        raise click.Abort() from None

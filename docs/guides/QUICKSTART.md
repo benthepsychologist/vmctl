@@ -18,8 +18,8 @@ All commands run from your **local machine** (Mac/Linux). No SSH into workstatio
 ### Step 1: Install vmws
 
 ```bash
-git clone https://github.com/benthepsychologist/vm-workstation-manager.git
-cd vm-workstation-manager
+git clone https://github.com/benthepsychologist/codestation.git
+cd codestation
 ./bin/vmws install
 ```
 
@@ -56,8 +56,8 @@ Takes ~6 minutes. Copies all your files, projects, dotfiles from workstation.
 ### Step 1: Install vmws
 
 ```bash
-git clone https://github.com/benthepsychologist/vm-workstation-manager.git
-cd vm-workstation-manager
+git clone https://github.com/benthepsychologist/codestation.git
+cd codestation
 ./bin/vmws install
 ```
 
@@ -185,4 +185,4 @@ If migrating from Cloud Workstation:
 
 ---
 
-**Questions?** [Open an issue](https://github.com/benthepsychologist/vm-workstation-manager/issues) or check the README!
+**Questions?** [Open an issue](https://github.com/benthepsychologist/codestation/issues) or check the README!

@@ -4,7 +4,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from vmws.config.manager import ConfigManager
+from codestation.config.manager import ConfigManager
 
 console = Console()
 
@@ -27,9 +27,9 @@ def config(
     """Configure VM settings.
 
     Examples:
-        vmws config --vm-name my-dev-vm --zone us-central1-a
-        vmws config --show
-        vmws config --project my-project
+        cstation config --vm-name my-dev-vm --zone us-central1-a
+        cstation config --show
+        cstation config --project my-project
     """
     try:
         config_mgr = ConfigManager()
@@ -38,7 +38,7 @@ def config(
         if show:
             if not config_mgr.config_exists():
                 console.print("[yellow]No configuration found.[/yellow]")
-                console.print("\nRun [blue]vmws config --vm-name <name> --zone <zone>[/blue] to create one")
+                console.print("\nRun [blue]cstation config --vm-name <name> --zone <zone>[/blue] to create one")
                 return
 
             current_config = config_mgr.load()
@@ -92,10 +92,10 @@ def config(
             # No options provided - show help
             console.print("[yellow]No options specified. Use --help for usage.[/yellow]")
             console.print("\nQuick start:")
-            console.print("  [blue]vmws config --vm-name my-dev-vm --zone us-central1-a[/blue]")
+            console.print("  [blue]cstation config --vm-name my-dev-vm --zone us-central1-a[/blue]")
             console.print("\nShow current config:")
-            console.print("  [blue]vmws config --show[/blue]")
+            console.print("  [blue]cstation config --show[/blue]")
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise click.Abort()
+        raise click.Abort() from None

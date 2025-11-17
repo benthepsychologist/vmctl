@@ -6,8 +6,8 @@ import time
 
 from rich.console import Console
 
-from vmws.config.models import VMConfig
-from vmws.core.exceptions import TunnelError
+from codestation.config.models import VMConfig
+from codestation.core.exceptions import TunnelError
 
 console = Console()
 

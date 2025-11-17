@@ -7,10 +7,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from vmws.cli.commands.backup_commands import backup, restore, snapshots
-from vmws.config.manager import ConfigManager
-from vmws.config.models import VMConfig
-from vmws.core.exceptions import DiskError
+from codestation.cli.commands.backup_commands import backup, restore, snapshots
+from codestation.config.manager import ConfigManager
+from codestation.config.models import VMConfig
+from codestation.core.exceptions import DiskError
 
 
 class TestBackupCommands:
@@ -39,7 +39,7 @@ class TestBackupCommands:
 class TestBackupCommand(TestBackupCommands):
     """Test backup command."""
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_backup_success_no_description(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -54,7 +54,7 @@ class TestBackupCommand(TestBackupCommands):
         assert "snapshot-test-vm-20240101-120000" in result.output
         mock_disk.snapshot.assert_called_once_with(None)
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_backup_success_with_description(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -68,7 +68,7 @@ class TestBackupCommand(TestBackupCommands):
         assert "Snapshot created successfully" in result.output
         mock_disk.snapshot.assert_called_once_with("Before major update")
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_backup_disk_error(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -82,7 +82,7 @@ class TestBackupCommand(TestBackupCommands):
         assert "Error" in result.output
         assert "Test disk error" in result.output
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_backup_shows_next_steps(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -93,14 +93,14 @@ class TestBackupCommand(TestBackupCommands):
 
         result = runner.invoke(backup)
         assert result.exit_code == 0
-        assert "vmws snapshots" in result.output
-        assert "vmws restore" in result.output
+        assert "cstation snapshots" in result.output
+        assert "cstation restore" in result.output
 
 
 class TestRestoreCommand(TestBackupCommands):
     """Test restore command."""
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_restore_with_yes_flag(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -113,7 +113,7 @@ class TestRestoreCommand(TestBackupCommands):
         assert "Restore completed successfully" in result.output
         mock_disk.restore.assert_called_once_with("snapshot-test-123")
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_restore_without_yes_confirmed(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -127,7 +127,7 @@ class TestRestoreCommand(TestBackupCommands):
         assert "Restore completed successfully" in result.output
         mock_disk.restore.assert_called_once_with("snapshot-test-123")
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_restore_without_yes_cancelled(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -140,7 +140,7 @@ class TestRestoreCommand(TestBackupCommands):
         assert "Cancelled" in result.output
         mock_disk.restore.assert_not_called()
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_restore_disk_error(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -154,7 +154,7 @@ class TestRestoreCommand(TestBackupCommands):
         assert "Error" in result.output
         assert "Snapshot not found" in result.output
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_restore_shows_warning(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -172,7 +172,7 @@ class TestRestoreCommand(TestBackupCommands):
 class TestSnapshotsCommand(TestBackupCommands):
     """Test snapshots command."""
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_snapshots_empty_list(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -184,9 +184,9 @@ class TestSnapshotsCommand(TestBackupCommands):
         result = runner.invoke(snapshots)
         assert result.exit_code == 0
         assert "No snapshots found" in result.output
-        assert "vmws backup" in result.output
+        assert "cstation backup" in result.output
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_snapshots_single_snapshot(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -209,7 +209,7 @@ class TestSnapshotsCommand(TestBackupCommands):
         assert "5.2" in result.output
         assert "Total snapshots: 1" in result.output
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_snapshots_multiple_snapshots(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -241,7 +241,7 @@ class TestSnapshotsCommand(TestBackupCommands):
         assert "snapshot-test-vm-20240103-120000" in result.output
         assert "Total snapshots: 3" in result.output
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_snapshots_disk_error(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -255,7 +255,7 @@ class TestSnapshotsCommand(TestBackupCommands):
         assert "Error" in result.output
         assert "Cannot list snapshots" in result.output
 
-    @patch("vmws.cli.commands.backup_commands.DiskManager")
+    @patch("codestation.cli.commands.backup_commands.DiskManager")
     def test_snapshots_shows_restore_help(
         self, mock_disk_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -268,4 +268,4 @@ class TestSnapshotsCommand(TestBackupCommands):
 
         result = runner.invoke(snapshots)
         assert result.exit_code == 0
-        assert "vmws restore" in result.output
+        assert "cstation restore" in result.output

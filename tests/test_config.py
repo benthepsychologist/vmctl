@@ -5,8 +5,8 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from vmws.config.manager import ConfigManager
-from vmws.config.models import VMConfig
+from codestation.config.manager import ConfigManager
+from codestation.config.models import VMConfig
 
 
 class TestVMConfig:

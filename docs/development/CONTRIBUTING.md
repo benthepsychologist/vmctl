@@ -2,9 +2,197 @@
 
 Thank you for your interest in contributing! This guide will help you understand the codebase and make improvements.
 
-## Code Structure
+## Python Version (Current)
 
-### Overview
+The project is now implemented in Python for better maintainability, testing, and distribution.
+
+### Quick Start
+
+```bash
+# Prerequisites: Python 3.12+, gcloud CLI
+python3 --version  # Should be 3.12+
+
+# Clone and setup
+git clone https://github.com/benthepsychologist/codestation.git
+cd codestation
+
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install in editable mode with dev dependencies
+pip install -e ".[dev]"
+
+# Verify installation
+vmws --version
+```
+
+### Code Structure
+
+```
+vm-workstation-manager/
+├── src/vmws/                   # Python package
+│   ├── __init__.py            # Package metadata
+│   ├── cli/                   # CLI implementation
+│   │   ├── main.py           # Entry point
+│   │   └── commands/         # Command implementations
+│   │       ├── vm_commands.py
+│   │       ├── backup_commands.py
+│   │       └── config_commands.py
+│   ├── core/                  # Core business logic
+│   │   ├── vm.py             # VM operations
+│   │   ├── disk.py           # Disk/snapshot operations
+│   │   └── tunnel.py         # IAP tunnel management
+│   ├── config/                # Configuration
+│   │   ├── manager.py        # Config file handling
+│   │   └── models.py         # Pydantic models
+│   └── utils/                 # Utilities
+├── tests/                     # Test suite
+│   ├── conftest.py           # Pytest fixtures
+│   ├── test_*.py             # Unit tests
+│   └── integration/          # Integration tests
+├── bin/vmws                   # Legacy bash CLI
+├── scripts/                   # VM setup scripts
+├── pyproject.toml             # Project config
+└── docs/                      # Documentation
+```
+
+### Development Workflow
+
+1. **Make changes** to Python code in `src/vmws/`
+
+2. **Run tests**:
+   ```bash
+   pytest                          # All tests
+   pytest tests/test_config.py -v  # Specific test
+   pytest --cov=src/vmws          # With coverage
+   ```
+
+3. **Type checking**:
+   ```bash
+   mypy src/vmws
+   ```
+
+4. **Linting**:
+   ```bash
+   ruff check src/vmws tests
+   ruff format src/vmws tests  # Auto-fix
+   ```
+
+5. **Test locally**:
+   ```bash
+   vmws --help
+   vmws status
+   ```
+
+### Code Style
+
+- **Type hints**: All functions must have type hints
+- **Docstrings**: Use Google-style docstrings
+- **Error handling**: Use custom exceptions from `core.exceptions`
+- **Testing**: Aim for 80%+ coverage
+- **Formatting**: Use ruff (line length: 100)
+
+Example:
+```python
+def create_snapshot(vm_name: str, description: str | None = None) -> str:
+    """Create a snapshot of the VM disk.
+
+    Args:
+        vm_name: Name of the VM instance
+        description: Optional snapshot description
+
+    Returns:
+        Snapshot name
+
+    Raises:
+        DiskError: If snapshot creation fails
+    """
+    # Implementation
+```
+
+### Adding New Commands
+
+1. **Create command function** in appropriate module:
+   ```python
+   # src/vmws/cli/commands/vm_commands.py
+   @click.command()
+   @click.option("--name", help="VM name")
+   def mycommand(name: str) -> None:
+       """Description of your command."""
+       console.print(f"Running command for {name}")
+   ```
+
+2. **Register in main.py**:
+   ```python
+   # src/vmws/cli/main.py
+   from vmws.cli.commands import vm_commands
+   cli.add_command(vm_commands.mycommand)
+   ```
+
+3. **Add tests**:
+   ```python
+   # tests/test_cli_vm.py
+   def test_mycommand(runner):
+       result = runner.invoke(cli, ["mycommand", "--name", "test"])
+       assert result.exit_code == 0
+   ```
+
+4. **Update documentation**: README.md, docstrings
+
+### Testing Guidelines
+
+**Unit Tests**: Mock external dependencies
+```python
+@patch("vmws.core.vm.run_command")
+def test_vm_start(mock_run: MagicMock) -> None:
+    mock_run.return_value = CommandResult(0, "OK", "")
+    vm = VMManager(config)
+    vm.start()
+    mock_run.assert_called_once()
+```
+
+**Integration Tests**: Test full workflows (use markers)
+```python
+@pytest.mark.integration
+def test_full_workflow():
+    # Tests that create real resources
+    pass
+```
+
+**Run only unit tests**:
+```bash
+pytest -m "not integration"
+```
+
+### Pre-commit Checklist
+
+Before committing:
+- [ ] All tests pass: `pytest`
+- [ ] Type checking passes: `mypy src/vmws`
+- [ ] Linting passes: `ruff check src/vmws tests`
+- [ ] Coverage ≥ 80%: `pytest --cov=src/vmws --cov-fail-under=80`
+- [ ] Docstrings added
+- [ ] Manual testing done
+
+### Building and Distribution
+
+```bash
+# Build package
+python -m build
+
+# Check distribution
+twine check dist/*
+
+# Test installation
+pip install dist/*.whl
+```
+
+## Bash Version (Legacy)
+
+The original bash implementation is still available in `bin/vmws` and `scripts/`.
+
+### Overview (Bash)
 
 ```
 vm-workstation-manager/
@@ -122,8 +310,8 @@ CHECK_INTERVAL_SECONDS=300  # Default: 5 minutes
 
 ```bash
 # Clone the repo
-git clone https://github.com/benthepsychologist/vm-workstation-manager.git
-cd vm-workstation-manager
+git clone https://github.com/benthepsychologist/codestation.git
+cd codestation
 
 # Make changes
 vim bin/vmws

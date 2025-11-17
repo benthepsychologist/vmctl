@@ -4,9 +4,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from vmws.config.manager import ConfigManager
-from vmws.core.disk import DiskManager
-from vmws.core.exceptions import DiskError
+from codestation.config.manager import ConfigManager
+from codestation.core.disk import DiskManager
+from codestation.core.exceptions import DiskError
 
 console = Console()
 
@@ -30,12 +30,12 @@ def backup(description: str | None) -> None:
 
         console.print("\n[green]Snapshot created successfully![/green]")
         console.print(f"[dim]Snapshot name: {snapshot_name}[/dim]")
-        console.print("\nView all snapshots: [blue]vmws snapshots[/blue]")
-        console.print("Restore from snapshot: [blue]vmws restore <snapshot-name>[/blue]")
+        console.print("\nView all snapshots: [blue]cstation snapshots[/blue]")
+        console.print("Restore from snapshot: [blue]cstation restore <snapshot-name>[/blue]")
 
     except DiskError as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise click.Abort()
+        raise click.Abort() from None
 
 
 @click.command()
@@ -58,7 +58,10 @@ def restore(snapshot_name: str, yes: bool) -> None:
         disk_mgr = DiskManager(config)
 
         if not yes:
-            console.print(f"[red]⚠ WARNING: This will replace the current data disk with snapshot {snapshot_name}[/red]")
+            console.print(
+                f"[red]⚠ WARNING: This will replace the current data disk "
+                f"with snapshot {snapshot_name}[/red]"
+            )
             console.print("[yellow]All current data on the VM will be lost![/yellow]")
             console.print("\n[dim]Make sure you have a recent backup if needed.[/dim]")
 
@@ -73,7 +76,7 @@ def restore(snapshot_name: str, yes: bool) -> None:
 
     except DiskError as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise click.Abort()
+        raise click.Abort() from None
 
 
 @click.command()
@@ -88,7 +91,7 @@ def snapshots() -> None:
 
         if not snapshot_list:
             console.print("[yellow]No snapshots found for this VM.[/yellow]")
-            console.print("\nCreate a backup: [blue]vmws backup[/blue]")
+            console.print("\nCreate a backup: [blue]cstation backup[/blue]")
             return
 
         table = Table(title=f"Snapshots for {config.vm_name}", show_header=True)
@@ -106,8 +109,8 @@ def snapshots() -> None:
         console.print(table)
 
         console.print(f"\n[dim]Total snapshots: {len(snapshot_list)}[/dim]")
-        console.print("\nRestore from snapshot: [blue]vmws restore <snapshot-name>[/blue]")
+        console.print("\nRestore from snapshot: [blue]cstation restore <snapshot-name>[/blue]")
 
     except DiskError as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise click.Abort()
+        raise click.Abort() from None

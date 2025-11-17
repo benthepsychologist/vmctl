@@ -1,29 +1,40 @@
-"""Configuration manager for VM Workstation Manager."""
+"""Configuration manager for Codestation."""
 
 import subprocess
 from pathlib import Path
 
-from vmws.config.models import ConfigPaths, VMConfig
+from codestation.config.migration import ConfigMigration
+from codestation.config.models import ConfigPaths, VMConfig
 
 
 class ConfigManager:
-    """Manages VM Workstation configuration."""
+    """Manages Codestation configuration."""
 
     def __init__(self, config_dir: Path | None = None) -> None:
         """Initialize configuration manager.
 
         Args:
-            config_dir: Override default config directory (~/.vmws)
+            config_dir: Override default config directory (~/.codestation)
         """
         self.paths = ConfigPaths(config_dir)
         self._config: VMConfig | None = None
+        self._migration_checked = False
 
     def load(self) -> VMConfig:
         """Load configuration from file or create default.
 
+        Automatically performs migration from ~/.vmws if needed.
+
         Returns:
             VMConfig instance with loaded or default values
         """
+        # Run migration check once per manager instance
+        if not self._migration_checked:
+            migration = ConfigMigration()
+            if migration.needs_migration():
+                migration.migrate()
+            self._migration_checked = True
+
         if self._config is not None:
             return self._config
 

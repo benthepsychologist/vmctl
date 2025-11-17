@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from vmws.cli.commands.vm_commands import (
+from codestation.cli.commands.vm_commands import (
     connect,
     create,
     delete,
@@ -19,9 +19,9 @@ from vmws.cli.commands.vm_commands import (
     stop,
     tunnel,
 )
-from vmws.config.manager import ConfigManager
-from vmws.config.models import VMConfig
-from vmws.core.exceptions import VMError
+from codestation.config.manager import ConfigManager
+from codestation.config.models import VMConfig
+from codestation.core.exceptions import VMError
 
 
 class TestVMCommands:
@@ -80,7 +80,7 @@ class TestStartCommand(TestVMCommands):
             assert result.exit_code == 1
             assert "No configuration found" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_start_vm_not_exists(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -93,7 +93,7 @@ class TestStartCommand(TestVMCommands):
         assert result.exit_code == 1
         assert "does not exist" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_start_already_running(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -108,7 +108,7 @@ class TestStartCommand(TestVMCommands):
         assert "already running" in result.output
         mock_vm.start.assert_not_called()
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_start_success(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -122,7 +122,7 @@ class TestStartCommand(TestVMCommands):
         assert result.exit_code == 0
         mock_vm.start.assert_called_once()
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_start_vm_error(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -139,7 +139,7 @@ class TestStartCommand(TestVMCommands):
 class TestStopCommand(TestVMCommands):
     """Test stop command."""
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_stop_vm_not_exists(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -152,7 +152,7 @@ class TestStopCommand(TestVMCommands):
         assert result.exit_code == 1
         assert "does not exist" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_stop_already_stopped(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -167,7 +167,7 @@ class TestStopCommand(TestVMCommands):
         assert "already stopped" in result.output
         mock_vm.stop.assert_not_called()
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_stop_success(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -181,7 +181,7 @@ class TestStopCommand(TestVMCommands):
         assert result.exit_code == 0
         mock_vm.stop.assert_called_once()
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_stop_vm_error(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -206,7 +206,7 @@ class TestStatusCommand(TestVMCommands):
             assert result.exit_code == 0
             assert "No configuration found" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_status_vm_not_exists(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -219,7 +219,7 @@ class TestStatusCommand(TestVMCommands):
         assert result.exit_code == 0
         assert "does not exist" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_status_running(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -232,10 +232,10 @@ class TestStatusCommand(TestVMCommands):
         result = runner.invoke(status)
         assert result.exit_code == 0
         assert "RUNNING" in result.output
-        assert "vmws tunnel" in result.output
-        assert "vmws ssh" in result.output
+        assert "cstation tunnel" in result.output
+        assert "cstation ssh" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_status_stopped(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -249,7 +249,7 @@ class TestStatusCommand(TestVMCommands):
         assert result.exit_code == 0
         assert "STOPPED" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_status_other_state(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -263,7 +263,7 @@ class TestStatusCommand(TestVMCommands):
         assert result.exit_code == 0
         assert "STAGING" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_status_vm_error(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -280,7 +280,7 @@ class TestStatusCommand(TestVMCommands):
 class TestSSHCommand(TestVMCommands):
     """Test ssh command."""
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_ssh_vm_not_exists(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -293,7 +293,7 @@ class TestSSHCommand(TestVMCommands):
         assert result.exit_code == 1
         assert "does not exist" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_ssh_vm_not_running(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -306,9 +306,9 @@ class TestSSHCommand(TestVMCommands):
         result = runner.invoke(ssh)
         assert result.exit_code == 1
         assert "TERMINATED" in result.output
-        assert "vmws start" in result.output
+        assert "cstation start" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_ssh_success_interactive(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -323,7 +323,7 @@ class TestSSHCommand(TestVMCommands):
         assert "Connecting" in result.output
         mock_vm.ssh.assert_called_once_with(None)
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_ssh_success_with_command(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -337,7 +337,7 @@ class TestSSHCommand(TestVMCommands):
         assert result.exit_code == 0
         mock_vm.ssh.assert_called_once_with("ls -la")
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_ssh_vm_error(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -354,7 +354,7 @@ class TestSSHCommand(TestVMCommands):
 class TestConnectCommand(TestVMCommands):
     """Test connect command (alias for ssh)."""
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_connect_delegates_to_ssh(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -372,8 +372,8 @@ class TestConnectCommand(TestVMCommands):
 class TestTunnelCommand(TestVMCommands):
     """Test tunnel command."""
 
-    @patch("vmws.cli.commands.vm_commands.TunnelManager")
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.TunnelManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_tunnel_vm_not_exists(
         self,
         mock_vm_class: MagicMock,
@@ -390,8 +390,8 @@ class TestTunnelCommand(TestVMCommands):
         assert result.exit_code == 1
         assert "does not exist" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.TunnelManager")
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.TunnelManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_tunnel_vm_not_running(
         self,
         mock_vm_class: MagicMock,
@@ -409,8 +409,8 @@ class TestTunnelCommand(TestVMCommands):
         assert result.exit_code == 1
         assert "TERMINATED" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.TunnelManager")
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.TunnelManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_tunnel_success_default_port(
         self,
         mock_vm_class: MagicMock,
@@ -435,8 +435,8 @@ class TestTunnelCommand(TestVMCommands):
         assert call_kwargs["local_port"] == 8080
         mock_tunnel.start.assert_called_once_with(background=False)
 
-    @patch("vmws.cli.commands.vm_commands.TunnelManager")
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.TunnelManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_tunnel_success_custom_port(
         self,
         mock_vm_class: MagicMock,
@@ -458,8 +458,8 @@ class TestTunnelCommand(TestVMCommands):
         call_kwargs = mock_tunnel_class.call_args[1]
         assert call_kwargs["local_port"] == 9090
 
-    @patch("vmws.cli.commands.vm_commands.TunnelManager")
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.TunnelManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_tunnel_keyboard_interrupt(
         self,
         mock_vm_class: MagicMock,
@@ -485,7 +485,7 @@ class TestTunnelCommand(TestVMCommands):
 class TestLogsCommand(TestVMCommands):
     """Test logs command."""
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_logs_vm_not_exists(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -498,7 +498,7 @@ class TestLogsCommand(TestVMCommands):
         assert result.exit_code == 1
         assert "does not exist" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_logs_success_default_file(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -513,7 +513,7 @@ class TestLogsCommand(TestVMCommands):
         assert "Test log content" in result.output
         mock_vm.logs.assert_called_once_with("/var/log/vm-auto-shutdown.log")
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_logs_success_custom_file(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -528,7 +528,7 @@ class TestLogsCommand(TestVMCommands):
         assert "Custom log content" in result.output
         mock_vm.logs.assert_called_once_with("/var/log/custom.log")
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_logs_vm_error(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -545,7 +545,7 @@ class TestLogsCommand(TestVMCommands):
 class TestDeleteCommand(TestVMCommands):
     """Test delete command."""
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_delete_vm_not_exists(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -558,7 +558,7 @@ class TestDeleteCommand(TestVMCommands):
         assert result.exit_code == 0
         assert "does not exist" in result.output
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_delete_with_yes_flag(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -571,7 +571,7 @@ class TestDeleteCommand(TestVMCommands):
         assert result.exit_code == 0
         mock_vm.delete.assert_called_once()
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_delete_without_yes_confirmed(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -585,7 +585,7 @@ class TestDeleteCommand(TestVMCommands):
         assert "WARNING" in result.output
         mock_vm.delete.assert_called_once()
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_delete_without_yes_cancelled(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
@@ -599,7 +599,7 @@ class TestDeleteCommand(TestVMCommands):
         assert "Cancelled" in result.output
         mock_vm.delete.assert_not_called()
 
-    @patch("vmws.cli.commands.vm_commands.VMManager")
+    @patch("codestation.cli.commands.vm_commands.VMManager")
     def test_delete_vm_error(
         self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
     ) -> None:
