@@ -1,0 +1,18 @@
+{
+  "workbench.startupEditor": "welcomePage",
+  "workbench.colorTheme": "Default Dark+",
+
+  "editor.fontSize": 14,
+  "editor.fontFamily": "Menlo, Monaco, 'Courier New', monospace",
+  "editor.minimap.enabled": true,
+  "editor.lineNumbers": "on",
+  "editor.wordWrap": "off",
+
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "git.enabled": true,
+
+  "roo-cline.apiProvider": "anthropic",
+  "roo-cline.anthropicApiKey": "${ANTHROPIC_API_KEY}",
+  "roo-cline.defaultModel": "claude-sonnet-4-20250514",
+  "roo-cline.position": "sidebar"
+}

@@ -31,7 +31,12 @@ def cli(ctx: click.Context) -> None:
 
 
 # Import command groups
-from codestation.cli.commands import backup_commands, config_commands, vm_commands
+from codestation.cli.commands import (
+    backup_commands,
+    config_commands,
+    docker_commands,
+    vm_commands,
+)
 
 # Register command groups
 cli.add_command(vm_commands.create)
@@ -50,6 +55,9 @@ cli.add_command(config_commands.config)
 cli.add_command(backup_commands.backup)
 cli.add_command(backup_commands.restore)
 cli.add_command(backup_commands.snapshots)
+
+cli.add_command(docker_commands.up)
+cli.add_command(docker_commands.down)
 
 
 if __name__ == "__main__":

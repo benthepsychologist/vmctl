@@ -1,0 +1,49 @@
+{
+  "workbench.startupEditor": "none",
+  "workbench.colorTheme": "Default Light+",
+
+  "workbench.activityBar.location": "hidden",
+  "workbench.statusBar.visible": false,
+  "workbench.panel.defaultLocation": "bottom",
+  "editor.minimap.enabled": false,
+  "breadcrumbs.enabled": false,
+
+  "editor.lineNumbers": "off",
+  "editor.glyphMargin": false,
+  "editor.folding": false,
+  "editor.fontSize": 16,
+  "editor.fontFamily": "Georgia, 'Times New Roman', serif",
+  "editor.wordWrap": "on",
+  "editor.renderWhitespace": "none",
+  "editor.renderLineHighlight": "none",
+
+  "git.enabled": false,
+  "debug.enableAllHoverProviders": false,
+  "terminal.integrated.tabs.enabled": false,
+  "terminal.integrated.commandsToSkipShell": ["*"],
+
+  "explorer.compactFolders": false,
+  "explorer.decorations.badges": false,
+  "explorer.confirmDelete": true,
+  "explorer.confirmDragAndDrop": true,
+
+  "apc.electron": {
+    "titleBarStyle": "hiddenInset"
+  },
+  "apc.stylesheet": {
+    ".title-label": "display: none !important;",
+    ".editor-actions": "display: none !important;",
+    ".tabs-container": "display: none !important;"
+  },
+
+  "roo-cline.apiProvider": "anthropic",
+  "roo-cline.anthropicApiKey": "${ANTHROPIC_API_KEY}",
+  "roo-cline.defaultModel": "claude-sonnet-4-20250514",
+  "roo-cline.position": "secondary-sidebar",
+  "roo-cline.sidebarWidth": 800,
+
+  "window.commandCenter": false,
+  "window.menuBarVisibility": "hidden",
+  "workbench.tips.enabled": false,
+  "workbench.welcomePage.walkthroughs.openOnInstall": false
+}
