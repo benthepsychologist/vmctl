@@ -1,0 +1,90 @@
+# Workstation Containers - Life + Dev Zones
+#
+# Trust gradient: agent < life < dev
+# - life: Operator zone for supervised LLM tooling (you're actively watching)
+# - dev: Builder zone for changing system capabilities
+#
+# Both zones share /workspace and can access agent app area for review/ops.
+
+services:
+  life:
+    build:
+      context: .
+      dockerfile: Dockerfile.life
+    image: workstation-life:latest
+    container_name: life
+    hostname: life
+    ports:
+      - "8080:8080"   # code-server
+    volumes:
+      # Shared workspace - visible to both life and dev
+      - workspace:/workspace
+      # Agent app area access (read/review agent outputs)
+      - agent-state:/agent/state:ro
+      - agent-outbox:/agent/outbox:ro
+      - agent-repo:/agent/repo:ro
+    environment:
+      - ZONE=life
+      - TRUST_LEVEL=operator
+    restart: unless-stopped
+    networks:
+      - workstation
+
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: workstation-dev:latest
+    container_name: dev
+    hostname: dev
+    ports:
+      - "8081:8080"   # code-server (different port)
+    volumes:
+      # Shared workspace - visible to both life and dev
+      - workspace:/workspace
+      # Agent app area access (full access for system changes)
+      - agent-state:/agent/state
+      - agent-outbox:/agent/outbox
+      - agent-repo:/agent/repo
+    environment:
+      - ZONE=dev
+      - TRUST_LEVEL=builder
+    restart: unless-stopped
+    networks:
+      - workstation
+
+networks:
+  workstation:
+    driver: bridge
+
+volumes:
+  # Shared workspace accessible to life and dev containers
+  workspace:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/home/user/workspace
+
+  # Agent app area volumes - isolated from agent's /workspace access
+  # These can be bind-mounted from a separate agent data directory
+  agent-state:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/home/user/agent-data/state
+
+  agent-outbox:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/home/user/agent-data/outbox
+
+  agent-repo:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/home/user/agent-data/repo
