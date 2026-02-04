@@ -15,6 +15,9 @@ class VMConfig(BaseModel):
         default=None, description="Source workstation disk for migration"
     )
     region: str | None = Field(default=None, description="Google Cloud region")
+    app_dir: str | None = Field(
+        default=None, description="Remote compose directory for Docker commands"
+    )
 
     @field_validator("vm_name")
     @classmethod
@@ -50,6 +53,7 @@ class VMConfig(BaseModel):
             f'PROJECT="{self.project or ""}"',
             f'WORKSTATION_DISK="{self.workstation_disk or ""}"',
             f'REGION="{self.region or ""}"',
+            f'APP_DIR="{self.app_dir or ""}"',
         ]
         return "\n".join(lines) + "\n"
 
@@ -62,6 +66,7 @@ class VMConfig(BaseModel):
         project: str | None = None
         workstation_disk: str | None = None
         region: str | None = None
+        app_dir: str | None = None
 
         for line in content.splitlines():
             line = line.strip()
@@ -86,6 +91,8 @@ class VMConfig(BaseModel):
                     workstation_disk = value_or_none
                 elif key == "REGION":
                     region = value_or_none
+                elif key == "APP_DIR":
+                    app_dir = value_or_none
 
         # Build config with explicit fields (use defaults if None)
         config_kwargs: dict[str, str | None] = {}
@@ -99,6 +106,8 @@ class VMConfig(BaseModel):
             config_kwargs["workstation_disk"] = workstation_disk
         if region is not None:
             config_kwargs["region"] = region
+        if app_dir is not None:
+            config_kwargs["app_dir"] = app_dir
 
         return cls(**config_kwargs)  # type: ignore[arg-type]
 

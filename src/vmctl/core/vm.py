@@ -174,6 +174,33 @@ class VMManager:
         except Exception as e:
             raise VMError(f"Failed to SSH to VM: {e}") from e
 
+    def ssh_exec(self, command: str) -> tuple[bool, str, str]:
+        """Execute a command on the VM via SSH and return output.
+
+        Unlike ssh(), this method captures and returns stdout/stderr
+        for programmatic use.
+
+        Args:
+            command: Command to execute on the VM
+
+        Returns:
+            Tuple of (success, stdout, stderr)
+        """
+        cmd = [
+            "gcloud",
+            "compute",
+            "ssh",
+            self.config.vm_name,
+            f"--zone={self.config.zone}",
+            f"--project={self.config.project}",
+            "--tunnel-through-iap",
+            "--command",
+            command,
+        ]
+
+        result = run_command(cmd, check=False)
+        return result.success, result.stdout, result.stderr
+
     def logs(self, log_file: str = "/var/log/vm-auto-shutdown.log") -> str:
         """Get logs from VM.
 
