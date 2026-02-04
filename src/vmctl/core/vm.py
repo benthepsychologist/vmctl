@@ -2,9 +2,9 @@
 
 from rich.console import Console
 
-from codestation.config.models import VMConfig
-from codestation.core.exceptions import VMError
-from codestation.utils.subprocess_runner import run_command
+from vmctl.config.models import VMConfig
+from vmctl.core.exceptions import VMError
+from vmctl.utils.subprocess_runner import run_command
 
 console = Console()
 

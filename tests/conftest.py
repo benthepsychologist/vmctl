@@ -6,8 +6,8 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from codestation.config.manager import ConfigManager
-from codestation.config.models import VMConfig
+from vmctl.config.manager import ConfigManager
+from vmctl.config.models import VMConfig
 
 
 @pytest.fixture

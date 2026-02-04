@@ -293,4 +293,4 @@ If you encounter issues:
 1. Check the generated report for error details
 2. Review GCP Console for resource status
 3. Check vmws logs: `vmws status`, `vmws logs`
-4. File an issue: https://github.com/benthepsychologist/codestation/issues
+4. File an issue: https://github.com/benthepsychologist/vmctl/issues

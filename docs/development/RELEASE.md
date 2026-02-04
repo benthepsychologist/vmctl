@@ -113,7 +113,7 @@ rm -rf release-test
 
 ### 5. Create GitHub Release
 
-1. Go to: https://github.com/benthepsychologist/codestation/releases/new
+1. Go to: https://github.com/benthepsychologist/vmctl/releases/new
 2. Select tag: `v$VERSION`
 3. Title: `v$VERSION - [Brief description]`
 4. Description: Copy from CHANGELOG.md
@@ -262,7 +262,7 @@ Follow [Keep a Changelog](https://keepachangelog.com/):
 ## Emergency Contacts
 
 - **PyPI Issues**: https://pypi.org/help/
-- **GitHub Issues**: https://github.com/benthepsychologist/codestation/issues
+- **GitHub Issues**: https://github.com/benthepsychologist/vmctl/issues
 - **Maintainer**: benthepsychologist
 
 ## Release Frequency

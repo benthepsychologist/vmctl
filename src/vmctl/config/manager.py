@@ -1,20 +1,20 @@
-"""Configuration manager for Codestation."""
+"""Configuration manager for vmctl."""
 
 import subprocess
 from pathlib import Path
 
-from codestation.config.migration import ConfigMigration
-from codestation.config.models import ConfigPaths, VMConfig
+from vmctl.config.migration import ConfigMigration
+from vmctl.config.models import ConfigPaths, VMConfig
 
 
 class ConfigManager:
-    """Manages Codestation configuration."""
+    """Manages vmctl configuration."""
 
     def __init__(self, config_dir: Path | None = None) -> None:
         """Initialize configuration manager.
 
         Args:
-            config_dir: Override default config directory (~/.codestation)
+            config_dir: Override default config directory (~/.vmctl)
         """
         self.paths = ConfigPaths(config_dir)
         self._config: VMConfig | None = None

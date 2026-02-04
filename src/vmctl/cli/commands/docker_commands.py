@@ -54,16 +54,16 @@ def up(mode: str, user: str | None) -> None:
     """Start code-server environment (local or cloud).
 
     Examples:
-        cstation up              # Start locally
-        cstation up --local      # Start locally (explicit)
-        cstation up --cloud --user you@gmail.com  # Deploy to cloud
+        vmctl up              # Start locally
+        vmctl up --local      # Start locally (explicit)
+        vmctl up --cloud --user you@gmail.com  # Deploy to cloud
     """
     if mode == "local":
         _up_local()
     elif mode == "cloud":
         if not user:
             console.print("[red]Error: --user required for cloud mode[/red]")
-            console.print("Example: cstation up --cloud --user you@gmail.com")
+            console.print("Example: vmctl up --cloud --user you@gmail.com")
             raise click.Abort()
         _up_cloud(user)
 
@@ -86,9 +86,9 @@ def down(mode: str) -> None:
     """Stop code-server environment (local or cloud).
 
     Examples:
-        cstation down            # Stop local
-        cstation down --local    # Stop local (explicit)
-        cstation down --cloud    # Stop cloud VM
+        vmctl down            # Stop local
+        vmctl down --local    # Stop local (explicit)
+        vmctl down --cloud    # Stop cloud VM
     """
     if mode == "local":
         _down_local()
@@ -101,13 +101,13 @@ def _up_local() -> None:
     console.print("[bold cyan]Starting code-server locally...[/bold cyan]")
 
     # Find the project root (where docker-compose.yml lives)
-    # This should be the codestation repo root
+    # This should be the vmctl repo root
     cwd = Path.cwd()
     compose_file = cwd / "docker-compose.yml"
 
     if not compose_file.exists():
         console.print(f"[red]Error: docker-compose.yml not found in {cwd}[/red]")
-        console.print("Make sure you're running from the codestation directory")
+        console.print("Make sure you're running from the vmctl directory")
         raise click.Abort()
 
     # Run docker compose up -d
@@ -127,15 +127,15 @@ def _up_local() -> None:
     time.sleep(2)
 
     # Check if container is running
-    exit_code, stdout, stderr = run_command(["docker", "ps", "--filter", "name=codestation"])
+    exit_code, stdout, stderr = run_command(["docker", "ps", "--filter", "name=vmctl"])
 
-    if "codestation" in stdout:
+    if "vmctl" in stdout:
         console.print("[green]✓[/green] code-server started successfully")
-        console.print(f"[bold green]🚀 Access at: http://localhost:8080[/bold green]")
-        console.print("\nTo stop: [cyan]cstation down --local[/cyan]")
+        console.print("[bold green]🚀 Access at: http://localhost:8080[/bold green]")
+        console.print("\nTo stop: [cyan]vmctl down --local[/cyan]")
     else:
         console.print("[yellow]Warning: Container may not be running[/yellow]")
-        console.print("Check logs with: docker logs codestation")
+        console.print("Check logs with: docker logs vmctl")
 
 
 def _down_local() -> None:

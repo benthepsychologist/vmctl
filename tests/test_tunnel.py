@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from codestation.config.models import VMConfig
-from codestation.core.exceptions import TunnelError
-from codestation.core.tunnel import TunnelManager
+from vmctl.config.models import VMConfig
+from vmctl.core.exceptions import TunnelError
+from vmctl.core.tunnel import TunnelManager
 
 
 @pytest.fixture
@@ -75,8 +75,8 @@ class TestTunnelManager:
 
             assert tunnel_manager.check_tunnel() is False
 
-    @patch("codestation.core.tunnel.subprocess.Popen")
-    @patch("codestation.core.tunnel.time.sleep")
+    @patch("vmctl.core.tunnel.subprocess.Popen")
+    @patch("vmctl.core.tunnel.time.sleep")
     def test_start_background(
         self, mock_sleep: MagicMock, mock_popen: MagicMock, tunnel_manager: TunnelManager
     ) -> None:
@@ -107,7 +107,7 @@ class TestTunnelManager:
         mock_sleep.assert_called_once_with(2)
         assert tunnel_manager._process is mock_process
 
-    @patch("codestation.core.tunnel.subprocess.run")
+    @patch("vmctl.core.tunnel.subprocess.run")
     def test_start_foreground(self, mock_run: MagicMock, tunnel_manager: TunnelManager) -> None:
         """Test starting tunnel in foreground."""
         tunnel_manager.start(background=False)
@@ -124,7 +124,7 @@ class TestTunnelManager:
         ]
         mock_run.assert_called_once_with(expected_cmd, check=True)
 
-    @patch("codestation.core.tunnel.subprocess.run")
+    @patch("vmctl.core.tunnel.subprocess.run")
     def test_start_foreground_keyboard_interrupt(
         self, mock_run: MagicMock, tunnel_manager: TunnelManager
     ) -> None:
@@ -134,7 +134,7 @@ class TestTunnelManager:
         # Should not raise, just exit gracefully
         tunnel_manager.start(background=False)
 
-    @patch("codestation.core.tunnel.subprocess.run")
+    @patch("vmctl.core.tunnel.subprocess.run")
     def test_start_foreground_error(
         self, mock_run: MagicMock, tunnel_manager: TunnelManager
     ) -> None:
@@ -144,7 +144,7 @@ class TestTunnelManager:
         with pytest.raises(TunnelError, match="Failed to start tunnel"):
             tunnel_manager.start(background=False)
 
-    @patch("codestation.core.tunnel.subprocess.Popen")
+    @patch("vmctl.core.tunnel.subprocess.Popen")
     def test_start_background_error(
         self, mock_popen: MagicMock, tunnel_manager: TunnelManager
     ) -> None:

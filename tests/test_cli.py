@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from codestation.cli.main import cli
-from codestation.config.models import VMConfig
+from vmctl.cli.main import cli
+from vmctl.config.models import VMConfig
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ class TestCLIVersion:
         """Test --version flag shows version."""
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
-        assert "cstation" in result.output.lower()
+        assert "vmctl" in result.output.lower()
 
 
 class TestCLIHelp:
@@ -42,7 +42,7 @@ class TestCLIHelp:
         """Test main CLI help."""
         result = runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
-        assert "Codestation" in result.output
+        assert "vmctl" in result.output
         assert "Quick Start:" in result.output
 
     def test_create_help(self, runner: CliRunner) -> None:
@@ -85,7 +85,7 @@ class TestCLIHelp:
 class TestCLICommands:
     """Test CLI command execution."""
 
-    @patch("codestation.cli.commands.config_commands.ConfigManager")
+    @patch("vmctl.cli.commands.config_commands.ConfigManager")
     def test_config_command(
         self,
         mock_config_manager: MagicMock,
@@ -105,8 +105,8 @@ class TestCLICommands:
         assert result.exit_code == 0
         mock_manager.update.assert_called_once()
 
-    @patch("codestation.cli.commands.vm_commands.VMManager")
-    @patch("codestation.cli.commands.vm_commands.ConfigManager")
+    @patch("vmctl.cli.commands.vm_commands.VMManager")
+    @patch("vmctl.cli.commands.vm_commands.ConfigManager")
     def test_status_command(
         self,
         mock_config_manager: MagicMock,
@@ -128,8 +128,8 @@ class TestCLICommands:
         assert result.exit_code == 0
         mock_vm.status.assert_called_once()
 
-    @patch("codestation.cli.commands.backup_commands.DiskManager")
-    @patch("codestation.cli.commands.backup_commands.ConfigManager")
+    @patch("vmctl.cli.commands.backup_commands.DiskManager")
+    @patch("vmctl.cli.commands.backup_commands.ConfigManager")
     def test_backup_command(
         self,
         mock_config_manager: MagicMock,
@@ -155,7 +155,7 @@ class TestCLICommands:
 class TestCLIErrorHandling:
     """Test CLI error handling."""
 
-    @patch("codestation.cli.commands.config_commands.ConfigManager")
+    @patch("vmctl.cli.commands.config_commands.ConfigManager")
     def test_config_missing_project(
         self,
         mock_config_manager: MagicMock,

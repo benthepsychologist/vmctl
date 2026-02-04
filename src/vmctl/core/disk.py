@@ -4,9 +4,9 @@ from datetime import datetime
 
 from rich.console import Console
 
-from codestation.config.models import VMConfig
-from codestation.core.exceptions import DiskError
-from codestation.utils.subprocess_runner import run_command
+from vmctl.config.models import VMConfig
+from vmctl.core.exceptions import DiskError
+from vmctl.utils.subprocess_runner import run_command
 
 console = Console()
 
@@ -120,7 +120,7 @@ class DiskManager:
 
         try:
             # Import here to avoid circular dependency
-            from codestation.core.vm import VMManager
+            from vmctl.core.vm import VMManager
 
             vm = VMManager(self.config)
 

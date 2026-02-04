@@ -213,7 +213,7 @@ pip uninstall vm-workstation-manager
 
 Found a bug or have a feature request?
 
-1. **Check existing issues:** https://github.com/benthepsychologist/codestation/issues
+1. **Check existing issues:** https://github.com/benthepsychologist/vmctl/issues
 2. **Search this document** for known issues
 3. **Report new issue** with:
    - Python version (`python --version`)

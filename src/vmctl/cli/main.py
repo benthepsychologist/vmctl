@@ -1,37 +1,37 @@
-"""Main CLI entry point for Codestation."""
+"""Main CLI entry point for vmctl."""
 
 import click
 from rich.console import Console
 
-from codestation import __version__
+from vmctl import __version__
 
 console = Console()
 
 
 @click.group()
-@click.version_option(version=__version__, prog_name="cstation")
+@click.version_option(version=__version__, prog_name="vmctl")
 @click.pass_context
 def cli(ctx: click.Context) -> None:
-    """Codestation - Self-managed development environments on Google Cloud.
+    """vmctl - Self-managed development environments on Google Cloud.
 
     Save 61-83% on cloud development costs by replacing Google Cloud Workstations
     with self-managed VMs.
 
     Quick Start:
-        cstation config          # Configure VM settings
-        cstation init-fresh      # Create new VM from scratch
-        cstation start           # Start VM
-        cstation tunnel          # Connect to code-server
-        cstation stop            # Stop VM to save money
+        vmctl config          # Configure VM settings
+        vmctl init-fresh      # Create new VM from scratch
+        vmctl start           # Start VM
+        vmctl tunnel          # Connect to code-server
+        vmctl stop            # Stop VM to save money
 
-    For more info: https://github.com/benthepsychologist/codestation
+    For more info: https://github.com/benthepsychologist/vmctl
     """
     # Ensure context object exists
     ctx.ensure_object(dict)
 
 
 # Import command groups
-from codestation.cli.commands import (
+from vmctl.cli.commands import (
     backup_commands,
     config_commands,
     docker_commands,

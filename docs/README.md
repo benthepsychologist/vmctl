@@ -26,22 +26,22 @@ Complete documentation for Codestation - Self-managed development environments o
 
 ### Installation
 ```bash
-pip install codestation
-cstation --version
+pip install vmctl
+vmctl --version
 ```
 
 ### Common Commands
 ```bash
-cstation config          # Configure VM settings
-cstation init-fresh      # Create new VM
-cstation start           # Start VM
-cstation tunnel          # Connect to code-server
-cstation stop            # Stop VM
+vmctl config          # Configure VM settings
+vmctl init-fresh      # Create new VM
+vmctl start           # Start VM
+vmctl tunnel          # Connect to code-server
+vmctl stop            # Stop VM
 ```
 
 ### Getting Help
 
-- [GitHub Issues](https://github.com/benthepsychologist/codestation/issues)
+- [GitHub Issues](https://github.com/benthepsychologist/vmctl/issues)
 - [Troubleshooting Guide](guides/TROUBLESHOOTING.md)
 - [Known Issues](guides/KNOWN-ISSUES.md)
 

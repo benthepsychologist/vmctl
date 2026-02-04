@@ -13,8 +13,8 @@ The project is now implemented in Python for better maintainability, testing, an
 python3 --version  # Should be 3.12+
 
 # Clone and setup
-git clone https://github.com/benthepsychologist/codestation.git
-cd codestation
+git clone https://github.com/benthepsychologist/vmctl.git
+cd vmctl
 
 # Create virtual environment
 python3 -m venv .venv
@@ -310,8 +310,8 @@ CHECK_INTERVAL_SECONDS=300  # Default: 5 minutes
 
 ```bash
 # Clone the repo
-git clone https://github.com/benthepsychologist/codestation.git
-cd codestation
+git clone https://github.com/benthepsychologist/vmctl.git
+cd vmctl
 
 # Make changes
 vim bin/vmws

@@ -1,4 +1,4 @@
-"""Configuration models for Codestation."""
+"""Configuration models for vmctl."""
 
 from pathlib import Path
 
@@ -110,9 +110,9 @@ class ConfigPaths:
         """Initialize config paths.
 
         Args:
-            config_dir: Override default config directory (~/.codestation)
+            config_dir: Override default config directory (~/.vmctl)
         """
-        self.config_dir = config_dir or Path.home() / ".codestation"
+        self.config_dir = config_dir or Path.home() / ".vmctl"
         self.config_file = self.config_dir / "config"
 
     def ensure_config_dir(self) -> None:

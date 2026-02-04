@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from codestation.config.models import VMConfig
-from codestation.core.disk import DiskManager
-from codestation.utils.subprocess_runner import CommandResult
+from vmctl.config.models import VMConfig
+from vmctl.core.disk import DiskManager
+from vmctl.utils.subprocess_runner import CommandResult
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ class TestDiskManager:
         """Test data disk name generation."""
         assert disk_manager.data_disk_name == "test-vm-disk"
 
-    @patch("codestation.core.disk.run_command")
+    @patch("vmctl.core.disk.run_command")
     def test_snapshot(self, mock_run: MagicMock, disk_manager: DiskManager) -> None:
         """Test creating snapshot."""
         mock_run.return_value = CommandResult(0, "Snapshot created", "")
@@ -46,7 +46,7 @@ class TestDiskManager:
         assert "disks" in call_args
         assert "snapshot" in call_args
 
-    @patch("codestation.core.disk.run_command")
+    @patch("vmctl.core.disk.run_command")
     def test_list_snapshots(self, mock_run: MagicMock, disk_manager: DiskManager) -> None:
         """Test listing snapshots."""
         mock_run.return_value = CommandResult(
@@ -61,7 +61,7 @@ class TestDiskManager:
         assert snapshots[0]["name"] == "test-vm-backup-123"
         assert snapshots[0]["size_gb"] == "200"
 
-    @patch("codestation.core.disk.run_command")
+    @patch("vmctl.core.disk.run_command")
     def test_list_snapshots_empty(self, mock_run: MagicMock, disk_manager: DiskManager) -> None:
         """Test listing snapshots when none exist."""
         mock_run.return_value = CommandResult(0, "[]", "")
@@ -70,7 +70,7 @@ class TestDiskManager:
 
         assert snapshots == []
 
-    @patch("codestation.core.disk.run_command")
+    @patch("vmctl.core.disk.run_command")
     def test_delete_snapshot(self, mock_run: MagicMock, disk_manager: DiskManager) -> None:
         """Test deleting snapshot."""
         mock_run.return_value = CommandResult(0, "Deleted", "")
@@ -83,7 +83,7 @@ class TestDiskManager:
         assert "delete" in call_args
         assert "test-vm-backup-123" in call_args
 
-    @patch("codestation.core.disk.run_command")
+    @patch("vmctl.core.disk.run_command")
     def test_snapshot_with_description(
         self, mock_run: MagicMock, disk_manager: DiskManager
     ) -> None:
@@ -96,27 +96,27 @@ class TestDiskManager:
         call_args = mock_run.call_args[0][0]
         assert "--description=Before upgrade" in call_args
 
-    @patch("codestation.core.disk.run_command")
+    @patch("vmctl.core.disk.run_command")
     def test_snapshot_error(self, mock_run: MagicMock, disk_manager: DiskManager) -> None:
         """Test snapshot creation error."""
-        from codestation.core.exceptions import DiskError, GCloudError
+        from vmctl.core.exceptions import DiskError, GCloudError
 
         mock_run.side_effect = GCloudError("Disk not found")
 
         with pytest.raises(DiskError, match="Failed to create snapshot"):
             disk_manager.snapshot()
 
-    @patch("codestation.core.disk.run_command")
+    @patch("vmctl.core.disk.run_command")
     def test_list_snapshots_error(self, mock_run: MagicMock, disk_manager: DiskManager) -> None:
         """Test list snapshots with error."""
-        from codestation.core.exceptions import DiskError, GCloudError
+        from vmctl.core.exceptions import DiskError, GCloudError
 
         mock_run.side_effect = GCloudError("Permission denied")
 
         with pytest.raises(DiskError, match="Failed to list snapshots"):
             disk_manager.list_snapshots()
 
-    @patch("codestation.core.disk.run_command")
+    @patch("vmctl.core.disk.run_command")
     def test_list_snapshots_empty_stdout(
         self, mock_run: MagicMock, disk_manager: DiskManager
     ) -> None:
@@ -127,18 +127,18 @@ class TestDiskManager:
 
         assert snapshots == []
 
-    @patch("codestation.core.disk.run_command")
+    @patch("vmctl.core.disk.run_command")
     def test_delete_snapshot_error(self, mock_run: MagicMock, disk_manager: DiskManager) -> None:
         """Test delete snapshot with error."""
-        from codestation.core.exceptions import DiskError, GCloudError
+        from vmctl.core.exceptions import DiskError, GCloudError
 
         mock_run.side_effect = GCloudError("Snapshot not found")
 
         with pytest.raises(DiskError, match="Failed to delete snapshot"):
             disk_manager.delete_snapshot("nonexistent")
 
-    @patch("codestation.core.disk.run_command")
-    @patch("codestation.core.vm.VMManager")
+    @patch("vmctl.core.disk.run_command")
+    @patch("vmctl.core.vm.VMManager")
     def test_restore_vm_running(
         self,
         mock_vm_class: MagicMock,
@@ -161,8 +161,8 @@ class TestDiskManager:
         # Verify disk operations
         assert mock_run.call_count == 2  # delete disk, create disk
 
-    @patch("codestation.core.disk.run_command")
-    @patch("codestation.core.vm.VMManager")
+    @patch("vmctl.core.disk.run_command")
+    @patch("vmctl.core.vm.VMManager")
     def test_restore_vm_stopped(
         self,
         mock_vm_class: MagicMock,
@@ -183,8 +183,8 @@ class TestDiskManager:
         # Should start VM after restore
         mock_vm.start.assert_called_once()
 
-    @patch("codestation.core.disk.run_command")
-    @patch("codestation.core.vm.VMManager")
+    @patch("vmctl.core.disk.run_command")
+    @patch("vmctl.core.vm.VMManager")
     def test_restore_vm_not_exists(
         self,
         mock_vm_class: MagicMock,
@@ -205,8 +205,8 @@ class TestDiskManager:
         # Should still create disk and start VM
         mock_vm.start.assert_called_once()
 
-    @patch("codestation.core.disk.run_command")
-    @patch("codestation.core.vm.VMManager")
+    @patch("vmctl.core.disk.run_command")
+    @patch("vmctl.core.vm.VMManager")
     def test_restore_error(
         self,
         mock_vm_class: MagicMock,
@@ -214,7 +214,7 @@ class TestDiskManager:
         disk_manager: DiskManager,
     ) -> None:
         """Test restore with error."""
-        from codestation.core.exceptions import DiskError, GCloudError
+        from vmctl.core.exceptions import DiskError, GCloudError
 
         mock_vm = MagicMock()
         mock_vm.exists.return_value = False
@@ -224,8 +224,8 @@ class TestDiskManager:
         with pytest.raises(DiskError, match="Failed to restore from snapshot"):
             disk_manager.restore("test-vm-backup-123")
 
-    @patch("codestation.core.disk.run_command")
-    @patch("codestation.core.vm.VMManager")
+    @patch("vmctl.core.disk.run_command")
+    @patch("vmctl.core.vm.VMManager")
     def test_restore_calls_correct_commands(
         self,
         mock_vm_class: MagicMock,
@@ -254,7 +254,7 @@ class TestDiskManager:
         assert "test-vm-disk" in create_call
         assert "--source-snapshot=test-vm-backup-123" in create_call
 
-    @patch("codestation.core.disk.run_command")
+    @patch("vmctl.core.disk.run_command")
     def test_snapshot_includes_disk_name(
         self, mock_run: MagicMock, disk_manager: DiskManager
     ) -> None:
@@ -266,7 +266,7 @@ class TestDiskManager:
         call_args = mock_run.call_args[0][0]
         assert "test-vm-disk" in call_args
 
-    @patch("codestation.core.disk.run_command")
+    @patch("vmctl.core.disk.run_command")
     def test_list_snapshots_filters_by_vm_name(
         self, mock_run: MagicMock, disk_manager: DiskManager
     ) -> None:
@@ -278,7 +278,7 @@ class TestDiskManager:
         call_args = mock_run.call_args[0][0]
         assert "--filter=name~^test-vm-backup-" in call_args
 
-    @patch("codestation.core.disk.run_command")
+    @patch("vmctl.core.disk.run_command")
     def test_delete_snapshot_includes_quiet_flag(
         self, mock_run: MagicMock, disk_manager: DiskManager
     ) -> None:

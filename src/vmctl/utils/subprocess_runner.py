@@ -3,7 +3,7 @@
 import subprocess
 from typing import Any
 
-from codestation.core.exceptions import GCloudError
+from vmctl.core.exceptions import GCloudError
 
 
 class CommandResult:

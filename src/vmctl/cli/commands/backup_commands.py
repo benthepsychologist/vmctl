@@ -4,9 +4,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from codestation.config.manager import ConfigManager
-from codestation.core.disk import DiskManager
-from codestation.core.exceptions import DiskError
+from vmctl.config.manager import ConfigManager
+from vmctl.core.disk import DiskManager
+from vmctl.core.exceptions import DiskError
 
 console = Console()
 
@@ -30,8 +30,8 @@ def backup(description: str | None) -> None:
 
         console.print("\n[green]Snapshot created successfully![/green]")
         console.print(f"[dim]Snapshot name: {snapshot_name}[/dim]")
-        console.print("\nView all snapshots: [blue]cstation snapshots[/blue]")
-        console.print("Restore from snapshot: [blue]cstation restore <snapshot-name>[/blue]")
+        console.print("\nView all snapshots: [blue]vmctl snapshots[/blue]")
+        console.print("Restore from snapshot: [blue]vmctl restore <snapshot-name>[/blue]")
 
     except DiskError as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -91,7 +91,7 @@ def snapshots() -> None:
 
         if not snapshot_list:
             console.print("[yellow]No snapshots found for this VM.[/yellow]")
-            console.print("\nCreate a backup: [blue]cstation backup[/blue]")
+            console.print("\nCreate a backup: [blue]vmctl backup[/blue]")
             return
 
         table = Table(title=f"Snapshots for {config.vm_name}", show_header=True)
@@ -109,7 +109,7 @@ def snapshots() -> None:
         console.print(table)
 
         console.print(f"\n[dim]Total snapshots: {len(snapshot_list)}[/dim]")
-        console.print("\nRestore from snapshot: [blue]cstation restore <snapshot-name>[/blue]")
+        console.print("\nRestore from snapshot: [blue]vmctl restore <snapshot-name>[/blue]")
 
     except DiskError as e:
         console.print(f"[red]Error: {e}[/red]")

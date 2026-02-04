@@ -1,4 +1,4 @@
-# Codestation
+# vmctl
 
 > Replace Google Cloud Workstations with self-managed VMs and save **$91-124/month**
 
@@ -15,10 +15,10 @@ A modern Python CLI tool to manage self-hosted development VMs as drop-in replac
 This tool runs **entirely from your local machine** (Mac/Linux). No need to SSH into Cloud Workstations.
 
 **Simple workflow:**
-1. Install `cstation` CLI on your Mac
-2. Configure once: `cstation config`
-3. Create VM: `cstation create` or `cstation init-fresh`
-4. Daily use: `cstation start` → `cstation tunnel` → code in browser
+1. Install `vmctl` CLI on your Mac
+2. Configure once: `vmctl config`
+3. Create VM: `vmctl create` or `vmctl init-fresh`
+4. Daily use: `vmctl start` → `vmctl tunnel` → code in browser
 5. Save money: VM auto-stops after 2hr idle
 
 **Under the hood:**
@@ -43,10 +43,10 @@ This tool runs **entirely from your local machine** (Mac/Linux). No need to SSH 
 
 ✅ **Simple CLI interface**
 ```bash
-cstation create   # Create VM from workstation
-cstation start    # Start VM
-cstation tunnel   # Connect to code-server
-cstation stop     # Stop VM
+vmctl create   # Create VM from workstation
+vmctl start    # Start VM
+vmctl tunnel   # Connect to code-server
+vmctl stop     # Stop VM
 ```
 
 ## Two Ways to Use This
@@ -74,22 +74,22 @@ Create a brand new development VM with Docker, code-server, and neovim pre-insta
 python3 --version  # Check version
 
 # Clone the repo
-git clone https://github.com/benthepsychologist/codestation.git
-cd codestation
+git clone https://github.com/benthepsychologist/vmctl.git
+cd vmctl
 
 # Install with pip
 pip install -e .
 
 # Verify installation
-cstation --version
+vmctl --version
 ```
 
 **Option B: Bash Script (Legacy)**
 
 ```bash
 # Clone the repo
-git clone https://github.com/benthepsychologist/codestation.git
-cd codestation
+git clone https://github.com/benthepsychologist/vmctl.git
+cd vmctl
 
 # Install CLI
 ./bin/vmws install
@@ -110,15 +110,15 @@ See [MIGRATION.md](MIGRATION.md) for details on the Python version and migration
 gcloud compute disks list --filter='name~workstations'
 # Look for: workstations-XXXXX (in your workstation's region)
 
-# Step 2: Configure cstation with the disk info
-cstation config \
+# Step 2: Configure vmctl with the disk info
+vmctl config \
   --workstation-disk workstations-XXXXX \
   --region northamerica-northeast1 \
   --zone northamerica-northeast1-b \
   --vm-name my-dev-vm
 
 # Step 3: Create the VM (runs remotely via gcloud)
-cstation create
+vmctl create
 ```
 
 **What happens:**
@@ -147,12 +147,12 @@ cstation create
 
 ```bash
 # Configure your VM settings
-cstation config \
+vmctl config \
   --vm-name my-dev-vm \
   --zone us-central1-a
 
 # Create fresh VM
-cstation init-fresh
+vmctl init-fresh
 ```
 
 **What happens:**
@@ -181,23 +181,23 @@ cstation init-fresh
 
 ```bash
 # Start your VM (takes ~30 seconds)
-cstation start
+vmctl start
 
 # Open tunnel to code-server (web-based VS Code)
-cstation tunnel
+vmctl tunnel
 # Then visit: http://localhost:8080 in your browser
 
 # Or SSH into the VM
-cstation ssh
+vmctl ssh
 
 # Check if VM is running
-cstation status
+vmctl status
 
 # Stop VM when done (save money)
-cstation stop
+vmctl stop
 
 # View auto-shutdown logs
-cstation logs
+vmctl logs
 ```
 
 **Key point:** Your VM auto-stops after 2 hours of idle time, so you only pay for compute when actively using it!
@@ -206,31 +206,31 @@ cstation logs
 
 | Command | Description |
 |---------|-------------|
-| `cstation create` | Create VM from workstation (run from workstation) |
-| `cstation init-fresh` | Create VM from scratch (no workstation needed) |
-| `cstation start` | Start stopped VM |
-| `cstation stop` | Stop VM to save money |
-| `cstation status` | Show VM status |
-| `cstation connect` / `cstation ssh` | SSH into VM |
-| `cstation tunnel` | Start IAP tunnel to code-server |
-| `cstation logs` | View auto-shutdown logs |
-| `cstation backup` | Create incremental snapshot of data disk |
-| `cstation snapshots` | List all snapshots |
-| `cstation restore <snapshot>` | Restore VM from snapshot |
-| `cstation config` | Configure VM name/zone/project |
-| `cstation delete` | Delete VM and all resources |
-| `cstation install` | Install CLI on local machine |
+| `vmctl create` | Create VM from workstation (run from workstation) |
+| `vmctl init-fresh` | Create VM from scratch (no workstation needed) |
+| `vmctl start` | Start stopped VM |
+| `vmctl stop` | Stop VM to save money |
+| `vmctl status` | Show VM status |
+| `vmctl connect` / `vmctl ssh` | SSH into VM |
+| `vmctl tunnel` | Start IAP tunnel to code-server |
+| `vmctl logs` | View auto-shutdown logs |
+| `vmctl backup` | Create incremental snapshot of data disk |
+| `vmctl snapshots` | List all snapshots |
+| `vmctl restore <snapshot>` | Restore VM from snapshot |
+| `vmctl config` | Configure VM name/zone/project |
+| `vmctl delete` | Delete VM and all resources |
+| `vmctl install` | Install CLI on local machine |
 
 ## Configuration
 
 ```bash
 # Interactive
-cstation config
+vmctl config
 
 # Or specify directly
-cstation config --vm-name my-dev-vm --zone us-central1-a --project my-project
+vmctl config --vm-name my-dev-vm --zone us-central1-a --project my-project
 
-# Config stored at: ~/.codestation/config
+# Config stored at: ~/.vmctl/config
 ```
 
 ## Cost Breakdown
@@ -259,13 +259,13 @@ cstation config --vm-name my-dev-vm --zone us-central1-a --project my-project
 
 ```bash
 # Create a backup (incremental, only changed blocks)
-cstation backup
+vmctl backup
 
 # List all backups
-cstation snapshots
+vmctl snapshots
 
 # Restore from a backup if something breaks
-cstation restore dev-workstation-backup-20251125-140530
+vmctl restore dev-workstation-backup-20251125-140530
 ```
 
 **Why snapshots?**
@@ -291,7 +291,7 @@ Tracks:
 
 **Adjust timeout:**
 ```bash
-cstation ssh
+vmctl ssh
 sudo vim /usr/local/bin/vm-auto-shutdown.sh
 # Change IDLE_TIMEOUT_MINUTES=120
 sudo systemctl restart vm-auto-shutdown
@@ -318,8 +318,8 @@ sudo systemctl restart vm-auto-shutdown
 ┌─────────────────────────┐
 │   Local Machine (Mac)   │
 │                         │
-│   $ cstation start      │
-│   $ cstation tunnel     │
+│   $ vmctl start      │
+│   $ vmctl tunnel     │
 └───────────┬─────────────┘
             │
             │ IAP Tunnel
@@ -354,8 +354,8 @@ sudo systemctl restart vm-auto-shutdown
 | **Web IDE** | ✅ Code OSS | ✅ code-server |
 | **Docker** | ✅ | ✅ |
 | **IAP Auth** | ✅ | ✅ |
-| **Start method** | Click in console | `cstation start` |
-| **Connect** | Click "Open" | `cstation tunnel` |
+| **Start method** | Click in console | `vmctl start` |
+| **Connect** | Click "Open" | `vmctl tunnel` |
 | **Updates** | Google manages | You manage |
 | **Setup time** | Instant | 6 min (one-time) |
 
@@ -363,17 +363,17 @@ sudo systemctl restart vm-auto-shutdown
 
 ```bash
 # Morning: Start your dev environment
-cstation start
+vmctl start
 
 # Open web IDE
-cstation tunnel &
+vmctl tunnel &
 open http://localhost:8080
 
 # Work on your code
 # VM auto-shuts down after 2hrs if idle
 
 # Or stop manually when done
-cstation stop
+vmctl stop
 ```
 
 ## Files Structure
@@ -422,11 +422,11 @@ See **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** for detailed solutions to commo
 Quick fixes:
 ```bash
 # Check status
-cstation status
-cstation logs
+vmctl status
+vmctl logs
 
 # Fix code-server permissions (common issue)
-cstation ssh
+vmctl ssh
 sudo chown -R $USER:$USER /mnt/home/user
 sudo systemctl restart code-server
 ```
@@ -438,11 +438,11 @@ sudo systemctl restart code-server
 1. **Test the VM** (keep both running)
    ```bash
    # On local machine
-   cstation create
+   vmctl create
 
    # Start and connect
-   cstation start
-   cstation tunnel
+   vmctl start
+   vmctl tunnel
    ```
 
 2. **Validate** (use VM for a few days)
@@ -461,7 +461,7 @@ sudo systemctl restart code-server
 A: Yes. Uses IAP (Identity-Aware Proxy) with same Google Cloud SSO as workstations. No public IPs exposed.
 
 **Q: What if my VM shuts down?**
-A: Just run `cstation start`. Takes ~30 seconds.
+A: Just run `vmctl start`. Takes ~30 seconds.
 
 **Q: Can I use a different machine type?**
 A: Yes. Edit `scripts/create-test-vm.sh` and change `MACHINE_TYPE`.
@@ -470,7 +470,7 @@ A: Yes. Edit `scripts/create-test-vm.sh` and change `MACHINE_TYPE`.
 A: Your data is on a persistent disk. Create snapshots regularly with `gcloud compute disks snapshot`.
 
 **Q: Can I run multiple VMs?**
-A: Yes. Use `cstation config --vm-name dev-vm-2` to manage different VMs.
+A: Yes. Use `vmctl config --vm-name dev-vm-2` to manage different VMs.
 
 ## Documentation
 
@@ -501,7 +501,7 @@ MIT License - see [LICENSE](LICENSE) file
 
 ## Support
 
-- **Issues:** [Report bugs or request features](https://github.com/benthepsychologist/codestation/issues)
+- **Issues:** [Report bugs or request features](https://github.com/benthepsychologist/vmctl/issues)
 - **Discussions:** Ask questions or share tips
 - **Pull Requests:** Contributions welcome!
 
@@ -534,10 +534,10 @@ Built with:
 **Save $91-124/month. Start today.**
 
 ```bash
-git clone https://github.com/benthepsychologist/codestation.git
-cd codestation
+git clone https://github.com/benthepsychologist/vmctl.git
+cd vmctl
 ./install.sh
-cstation create
+vmctl create
 ```
 
 **Star ⭐ this repo if it helps you!**

@@ -3,16 +3,16 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "codestation"
+name = "vmctl"
 version = "3.0.0"
-description = "Codestation - Self-managed development environments on Google Cloud"
+description = "vmctl - Self-managed development environments on Google Cloud"
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
     {name = "benthepsychologist", email = "ben@example.com"}
 ]
-keywords = ["codestation", "gcp", "cloud", "development", "coding", "devenv", "cli"]
+keywords = ["vmctl", "gcp", "cloud", "development", "coding", "devenv", "cli", "vm"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -44,13 +44,12 @@ dev = [
 ]
 
 [project.scripts]
-cstation = "codestation.cli.main:cli"
-vmws = "codestation.cli.compat:vmws_compat"
+vmctl = "vmctl.cli.main:cli"
 
 [project.urls]
-Homepage = "https://github.com/benthepsychologist/codestation"
-Issues = "https://github.com/benthepsychologist/codestation/issues"
-Repository = "https://github.com/benthepsychologist/codestation"
+Homepage = "https://github.com/benthepsychologist/vmctl"
+Issues = "https://github.com/benthepsychologist/vmctl/issues"
+Repository = "https://github.com/benthepsychologist/vmctl"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -65,7 +64,7 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
     "--verbose",
-    "--cov=src/codestation",
+    "--cov=src/vmctl",
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
@@ -79,7 +78,7 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 strict = true
-files = ["src/codestation", "tests"]
+files = ["src/vmctl", "tests"]
 
 [tool.ruff]
 target-version = "py312"
@@ -102,7 +101,7 @@ ignore = []
 "tests/integration/*" = ["E501"]  # Allow long lines in integration tests (commands, markdown templates)
 
 [tool.coverage.run]
-source = ["src/codestation"]
+source = ["src/vmctl"]
 omit = ["*/tests/*", "*/__init__.py"]
 
 [tool.coverage.report]

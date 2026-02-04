@@ -1,66 +1,58 @@
 # Migration Guide
 
-## Upgrading to v3.0.0 (Project Rename: vmws → cstation)
+## Upgrading to v3.0.0 (Project Rename: vmws/cstation → vmctl)
 
-**Version 3.0.0 introduces a major branding change:** The package is now called **Codestation** with the CLI command `cstation`.
+**Version 3.0.0 introduces a major branding change:** The package is now called **vmctl**.
 
 ### What Changed
 
 | Old (v2.x) | New (v3.0.0) |
 |------------|--------------|
-| Package name: `vm-workstation-manager` | Package name: `codestation` |
-| CLI command: `vmws` | CLI command: `cstation` |
-| Config directory: `~/.vmws/` | Config directory: `~/.codestation/` |
-| Import: `from vmws.config import ...` | Import: `from codestation.config import ...` |
+| Package name: `vm-workstation-manager` / `codestation` | Package name: `vmctl` |
+| CLI command: `vmws` / `cstation` | CLI command: `vmctl` |
+| Config directory: `~/.vmws/` / `~/.codestation/` | Config directory: `~/.vmctl/` |
+| Import: `from vmws.config import ...` | Import: `from vmctl.config import ...` |
 
 ### Backward Compatibility
 
-**Good news:** v3.0.0 maintains full backward compatibility:
+**Good news:** v3.0.0 includes automatic migration:
 
-✅ **`vmws` command still works** - Shows deprecation warning, forwards to `cstation`
-✅ **Automatic config migration** - First run copies `~/.vmws/` → `~/.codestation/`
-✅ **Original config preserved** - `~/.vmws/` is kept for rollback
+✅ **Automatic config migration** - First run copies `~/.vmws/` or `~/.codestation/` → `~/.vmctl/`
+✅ **Original config preserved** - Legacy directories are kept for rollback
 ✅ **VMs continue to work** - No changes needed to existing VMs
 
 ### Upgrading
 
 ```bash
 # Upgrade to v3.0.0
-pip install --upgrade codestation
+pip install --upgrade vmctl
 
 # Verify version
-cstation --version
-# Output: cstation, version 3.0.0
+vmctl --version
+# Output: vmctl, version 3.0.0
 
 # Your old config is automatically migrated
-cstation config --show
-# Migrating configuration from ~/.vmws to ~/.codestation...
+vmctl config --show
+# Migrating configuration from ~/.codestation to ~/.vmctl...
 #   Copied config
 # ✓ Migration complete!
 ```
 
 ### Update Your Scripts
 
-Update any scripts using `vmws` to use `cstation`:
+Update any scripts using `vmws` or `cstation` to use `vmctl`:
 
 ```bash
 # Old (v2.x)
-vmws start
-vmws tunnel
-vmws stop
+vmws start      # or cstation start
+vmws tunnel     # or cstation tunnel
+vmws stop       # or cstation stop
 
 # New (v3.0.0)
-cstation start
-cstation tunnel
-cstation stop
+vmctl start
+vmctl tunnel
+vmctl stop
 ```
-
-### Deprecation Timeline
-
-- **v3.0.0 (current)**: `vmws` command works with deprecation warning
-- **v4.0.0 (future)**: `vmws` command will be removed
-
-**Recommendation:** Update to `cstation` now to avoid warnings and prepare for v4.0.0.
 
 ---
 
@@ -77,7 +69,7 @@ The Python version is **100% backward compatible**. Your existing config and VMs
 pip install -e .
 
 # Your old config still works
-cstation status  # Same commands, same behavior
+vmctl status  # Same commands, same behavior
 ```
 
 ## Why Migrate?
@@ -87,7 +79,7 @@ The Python version offers significant improvements:
 - **Type Safety**: Full mypy type checking prevents bugs
 - **Better Testing**: 99% test coverage with pytest
 - **IDE Support**: Autocomplete and refactoring in IDEs
-- **Easier Distribution**: Install via `pip install vmws`
+- **Easier Distribution**: Install via `pip install vmctl`
 - **Modern CLI**: Rich terminal output and progress indicators
 - **Maintainability**: Cleaner code organization and error handling
 
@@ -100,7 +92,7 @@ The Python version offers significant improvements:
 pip install -e .
 
 # Or from PyPI (when released)
-pip install vm-workstation-manager
+pip install vmctl
 ```
 
 ### Option 2: Keep using bash
@@ -111,7 +103,7 @@ The bash version (`bin/vmws`) continues to work. You can keep using it if prefer
 
 ### Configuration Files
 
-Your existing `~/.codestation/config` file works with both versions:
+Your existing `~/.vmctl/config` file works with both versions:
 
 ```bash
 # Bash format (current)
@@ -134,20 +126,20 @@ All bash commands work identically in Python:
 
 | Command | Bash | Python | Notes |
 |---------|------|--------|-------|
-| `cstation config` | ✅ | ✅ | Same options |
-| `cstation create` | ✅ | ⚠️ | Not yet implemented |
-| `cstation init-fresh` | ✅ | ⚠️ | Not yet implemented |
-| `cstation start` | ✅ | ✅ | Same behavior |
-| `cstation stop` | ✅ | ✅ | Same behavior |
-| `cstation status` | ✅ | ✅ | Enhanced output |
-| `cstation connect` | ✅ | ✅ | Alias for ssh |
-| `cstation ssh` | ✅ | ✅ | Same behavior |
-| `cstation tunnel` | ✅ | ✅ | Same ports |
-| `cstation logs` | ✅ | ✅ | Same log files |
-| `cstation delete` | ✅ | ✅ | Same confirmations |
-| `cstation backup` | ✅ | ✅ | Same snapshots |
-| `cstation restore` | ✅ | ✅ | Same flow |
-| `cstation snapshots` | ✅ | ✅ | Same output |
+| `vmctl config` | ✅ | ✅ | Same options |
+| `vmctl create` | ✅ | ⚠️ | Not yet implemented |
+| `vmctl init-fresh` | ✅ | ⚠️ | Not yet implemented |
+| `vmctl start` | ✅ | ✅ | Same behavior |
+| `vmctl stop` | ✅ | ✅ | Same behavior |
+| `vmctl status` | ✅ | ✅ | Enhanced output |
+| `vmctl connect` | ✅ | ✅ | Alias for ssh |
+| `vmctl ssh` | ✅ | ✅ | Same behavior |
+| `vmctl tunnel` | ✅ | ✅ | Same ports |
+| `vmctl logs` | ✅ | ✅ | Same log files |
+| `vmctl delete` | ✅ | ✅ | Same confirmations |
+| `vmctl backup` | ✅ | ✅ | Same snapshots |
+| `vmctl restore` | ✅ | ✅ | Same flow |
+| `vmctl snapshots` | ✅ | ✅ | Same output |
 
 ### Virtual Machines
 
@@ -167,25 +159,25 @@ Your existing VMs work with both versions:
 python3 --version  # Should be 3.12 or higher
 
 # Clone repo (if not already)
-git clone https://github.com/benthepsychologist/codestation.git
-cd codestation
+git clone https://github.com/benthepsychologist/vmctl.git
+cd vmctl
 
 # Install with pip
 pip install -e .
 
 # Verify installation
-cstation --version
+vmctl --version
 ```
 
 ### 2. Test with Existing Config
 
 ```bash
 # Your existing config should work
-cstation status
+vmctl status
 
 # Try other commands
-cstation backup
-cstation snapshots
+vmctl backup
+vmctl snapshots
 ```
 
 ### 3. Gradual Transition
@@ -194,7 +186,7 @@ You can use both versions side-by-side:
 
 ```bash
 # Use Python version (if in PATH)
-cstation status
+vmctl status
 
 # Use bash version explicitly
 ./bin/vmws status
@@ -206,16 +198,16 @@ Test key workflows:
 
 ```bash
 # VM lifecycle
-cstation status
-cstation start
-cstation stop
+vmctl status
+vmctl start
+vmctl stop
 
 # Tunneling
-cstation tunnel
+vmctl tunnel
 
 # Backups
-cstation backup
-cstation snapshots
+vmctl backup
+vmctl snapshots
 ```
 
 ## Differences
@@ -227,7 +219,7 @@ The Python version adds:
 **Rich Terminal Output**:
 ```bash
 # Colored progress indicators
-cstation start
+vmctl start
 Starting VM test-vm...
 ✓ VM started successfully
 ```
@@ -235,15 +227,15 @@ Starting VM test-vm...
 **Better Error Messages**:
 ```bash
 # Clear, actionable errors
-cstation start
+vmctl start
 Error: VM not found
-→ Run 'cstation create' to create a VM first
+→ Run 'vmctl create' to create a VM first
 ```
 
 **Type Validation**:
 ```bash
 # Config validation
-cstation config --vm-name "123-invalid"
+vmctl config --vm-name "123-invalid"
 Error: VM name must start with a letter
 ```
 
@@ -251,8 +243,8 @@ Error: VM name must start with a letter
 
 The following commands are stubs in the Python version:
 
-- `cstation create` - Use bash version for now
-- `cstation init-fresh` - Use bash version for now
+- `vmctl create` - Use bash version for now
+- `vmctl init-fresh` - Use bash version for now
 
 These will be implemented in a future release.
 
@@ -262,7 +254,7 @@ These will be implemented in a future release.
 
 ```bash
 # Check pip installation
-which vmws
+which vmctl
 
 # If not found, try
 pip install -e . --force-reinstall
@@ -282,10 +274,10 @@ pip install -e ".[dev]"
 
 ```bash
 # Check config file exists
-ls -la ~/.codestation/config
+ls -la ~/.vmctl/config
 
 # Check format is correct
-cat ~/.codestation/config
+cat ~/.vmctl/config
 ```
 
 ### VM commands fail
@@ -296,12 +288,12 @@ gcloud auth list
 gcloud config get-value project
 
 # Check config has project
-cstation config --show
+vmctl config --show
 ```
 
 ## Getting Help
 
-- Check existing issues: https://github.com/benthepsychologist/codestation/issues
+- Check existing issues: https://github.com/benthepsychologist/vmctl/issues
 - Read the docs: README.md, CONTRIBUTING.md
 - Review test files: `tests/` directory for usage examples
 
@@ -311,7 +303,7 @@ To revert to bash version:
 
 ```bash
 # Uninstall Python package
-pip uninstall codestation
+pip uninstall vmctl
 
 # Use bash script directly
 ./bin/vmws status
@@ -337,5 +329,5 @@ Upcoming Python version features:
 ## Feedback
 
 Please report issues or suggestions:
-- GitHub Issues: https://github.com/benthepsychologist/codestation/issues
+- GitHub Issues: https://github.com/benthepsychologist/vmctl/issues
 - Include: Python version, OS, error messages, steps to reproduce

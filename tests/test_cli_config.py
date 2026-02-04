@@ -7,9 +7,9 @@ from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 
-from codestation.cli.commands.config_commands import config
-from codestation.config.manager import ConfigManager
-from codestation.config.models import VMConfig
+from vmctl.cli.commands.config_commands import config
+from vmctl.config.manager import ConfigManager
+from vmctl.config.models import VMConfig
 
 
 class TestConfigCommand:
@@ -24,7 +24,7 @@ class TestConfigCommand:
     def temp_config_dir(self, monkeypatch: pytest.MonkeyPatch) -> Path:
         """Create temporary config directory."""
         with TemporaryDirectory() as tmpdir:
-            config_dir = Path(tmpdir) / ".vmws"
+            config_dir = Path(tmpdir) / ".vmctl"
             config_dir.mkdir(parents=True)
             # Mock the home directory to use temp dir
             monkeypatch.setenv("HOME", tmpdir)
@@ -35,7 +35,7 @@ class TestConfigCommand:
         result = runner.invoke(config)
         assert result.exit_code == 0
         assert "No options specified" in result.output
-        assert "cstation config --vm-name" in result.output
+        assert "vmctl config --vm-name" in result.output
 
     def test_config_show_no_config(self, runner: CliRunner, temp_config_dir: Path) -> None:
         """Test --show with no existing config."""
@@ -149,7 +149,7 @@ class TestConfigCommand:
     def test_config_error_handling(self, runner: CliRunner, temp_config_dir: Path) -> None:
         """Test error handling in config command."""
         # Mock ConfigManager to raise exception
-        with patch("codestation.cli.commands.config_commands.ConfigManager") as mock_mgr:
+        with patch("vmctl.cli.commands.config_commands.ConfigManager") as mock_mgr:
             mock_mgr.side_effect = Exception("Test error")
             result = runner.invoke(config, ["--show"])
             assert result.exit_code != 0
@@ -187,4 +187,4 @@ class TestConfigCommand:
         result = runner.invoke(config, ["--vm-name", "path-test", "--zone", "us-central1-a"])
         assert result.exit_code == 0
         assert "Saved to:" in result.output
-        assert ".codestation/config" in result.output
+        assert ".vmctl/config" in result.output

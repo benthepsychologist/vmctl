@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from codestation.core.exceptions import GCloudError
-from codestation.utils.subprocess_runner import CommandResult, run_command
+from vmctl.core.exceptions import GCloudError
+from vmctl.utils.subprocess_runner import CommandResult, run_command
 
 
 class TestCommandResult:
@@ -56,7 +56,7 @@ class TestCommandResult:
 class TestRunCommand:
     """Test run_command function."""
 
-    @patch("codestation.utils.subprocess_runner.subprocess.run")
+    @patch("vmctl.utils.subprocess_runner.subprocess.run")
     def test_run_command_success(self, mock_run: MagicMock) -> None:
         """Test successful command execution."""
         mock_run.return_value = MagicMock(
@@ -78,7 +78,7 @@ class TestRunCommand:
             timeout=None,
         )
 
-    @patch("codestation.utils.subprocess_runner.subprocess.run")
+    @patch("vmctl.utils.subprocess_runner.subprocess.run")
     def test_run_command_failure(self, mock_run: MagicMock) -> None:
         """Test failed command execution."""
         mock_run.return_value = MagicMock(
@@ -93,7 +93,7 @@ class TestRunCommand:
         assert result.returncode == 1
         assert result.stderr == "error occurred"
 
-    @patch("codestation.utils.subprocess_runner.subprocess.run")
+    @patch("vmctl.utils.subprocess_runner.subprocess.run")
     def test_run_command_with_check_success(self, mock_run: MagicMock) -> None:
         """Test command with check=True on success."""
         mock_run.return_value = MagicMock(
@@ -107,7 +107,7 @@ class TestRunCommand:
         assert result.success is True
         assert result.stdout == "success"
 
-    @patch("codestation.utils.subprocess_runner.subprocess.run")
+    @patch("vmctl.utils.subprocess_runner.subprocess.run")
     def test_run_command_with_check_failure(self, mock_run: MagicMock) -> None:
         """Test command with check=True on failure."""
         mock_run.return_value = MagicMock(
@@ -119,7 +119,7 @@ class TestRunCommand:
         with pytest.raises(GCloudError, match="Command failed with exit code 1"):
             run_command(["false"], check=True)
 
-    @patch("codestation.utils.subprocess_runner.subprocess.run")
+    @patch("vmctl.utils.subprocess_runner.subprocess.run")
     def test_run_command_with_timeout(self, mock_run: MagicMock) -> None:
         """Test command with timeout parameter."""
         mock_run.return_value = MagicMock(
@@ -138,7 +138,7 @@ class TestRunCommand:
             timeout=5.0,
         )
 
-    @patch("codestation.utils.subprocess_runner.subprocess.run")
+    @patch("vmctl.utils.subprocess_runner.subprocess.run")
     def test_run_command_timeout_expired(self, mock_run: MagicMock) -> None:
         """Test command that times out."""
         mock_run.side_effect = subprocess.TimeoutExpired(
@@ -149,7 +149,7 @@ class TestRunCommand:
         with pytest.raises(GCloudError, match="Command timed out after 1.0s"):
             run_command(["sleep", "100"], timeout=1.0)
 
-    @patch("codestation.utils.subprocess_runner.subprocess.run")
+    @patch("vmctl.utils.subprocess_runner.subprocess.run")
     def test_run_command_file_not_found(self, mock_run: MagicMock) -> None:
         """Test command that doesn't exist."""
         mock_run.side_effect = FileNotFoundError()
@@ -157,7 +157,7 @@ class TestRunCommand:
         with pytest.raises(GCloudError, match="Command not found: nonexistent"):
             run_command(["nonexistent", "arg"])
 
-    @patch("codestation.utils.subprocess_runner.subprocess.run")
+    @patch("vmctl.utils.subprocess_runner.subprocess.run")
     def test_run_command_with_kwargs(self, mock_run: MagicMock) -> None:
         """Test command with additional subprocess kwargs."""
         mock_run.return_value = MagicMock(
@@ -178,7 +178,7 @@ class TestRunCommand:
         assert call_kwargs["cwd"] == "/tmp"
         assert call_kwargs["env"] == {"PATH": "/usr/bin"}
 
-    @patch("codestation.utils.subprocess_runner.subprocess.run")
+    @patch("vmctl.utils.subprocess_runner.subprocess.run")
     def test_run_command_strips_whitespace(self, mock_run: MagicMock) -> None:
         """Test that stdout and stderr are stripped."""
         mock_run.return_value = MagicMock(
@@ -192,7 +192,7 @@ class TestRunCommand:
         assert result.stdout == "output with spaces"
         assert result.stderr == "error message"
 
-    @patch("codestation.utils.subprocess_runner.subprocess.run")
+    @patch("vmctl.utils.subprocess_runner.subprocess.run")
     def test_run_command_captures_output(self, mock_run: MagicMock) -> None:
         """Test that run_command always captures output."""
         mock_run.return_value = MagicMock(
