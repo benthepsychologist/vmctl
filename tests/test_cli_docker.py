@@ -215,7 +215,10 @@ class TestDeployCommand(TestDockerCommands):
         assert "deployed successfully" in result.output
         # Verify the command includes the app_dir
         call_args = mock_vm.ssh_exec.call_args
-        assert "/opt/apps/myapp" in call_args[0][0]
+        remote_script = call_args[0][0]
+        assert 'cd "/opt/apps/myapp"' in remote_script
+        assert "deploy.sh" in remote_script
+        assert "git pull --ff-only" in remote_script
 
     @patch("vmctl.cli.commands.docker_commands.VMManager")
     def test_deploy_with_explicit_app_dir(
@@ -237,7 +240,10 @@ class TestDeployCommand(TestDockerCommands):
         assert result.exit_code == 0
         # Verify explicit app-dir overrides config
         call_args = mock_vm.ssh_exec.call_args
-        assert "/opt/apps/other" in call_args[0][0]
+        remote_script = call_args[0][0]
+        assert 'cd "/opt/apps/other"' in remote_script
+        assert "deploy.sh" in remote_script
+        assert "git pull --ff-only" in remote_script
 
     @patch("vmctl.cli.commands.docker_commands.VMManager")
     def test_deploy_failure(

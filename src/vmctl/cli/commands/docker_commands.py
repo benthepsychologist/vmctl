@@ -279,8 +279,14 @@ def provision() -> None:
         provision_script = """
 set -e
 
+# Ensure curl/git exist (curl needed for Docker install; git for optional deploy sync)
+if ! command -v curl >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then
+    sudo apt-get update -y
+    sudo apt-get install -y curl git
+fi
+
 # Check if Docker is already installed
-if command -v docker &> /dev/null; then
+if command -v docker >/dev/null 2>&1; then
     echo "Docker is already installed:"
     docker --version
 else
@@ -361,7 +367,18 @@ def deploy(app_dir: str | None) -> None:
         # Run docker compose up with sudo for fresh VM compatibility
         deploy_cmd = f"""
 set -e
-cd {resolved_dir}
+cd "{resolved_dir}"
+
+# Optional app-provided deploy hook (app-owned behavior)
+if [ -f ./deploy.sh ]; then
+    echo "Running pre-deploy hook: ./deploy.sh"
+    bash ./deploy.sh
+elif [ -d .git ]; then
+    echo "Updating git checkout (ff-only)..."
+    git pull --ff-only
+else
+    echo "No deploy.sh or .git found; skipping source update."
+fi
 
 # Check for any valid compose file
 if [ ! -f docker-compose.yml ] && [ ! -f docker-compose.yaml ] && \
@@ -430,7 +447,7 @@ def docker_ps(app_dir: str | None, show_all: bool) -> None:
 
         all_flag = "-a" if show_all else ""
         ps_cmd = f"""
-cd {resolved_dir}
+    cd "{resolved_dir}"
 sudo docker compose ps {all_flag}
 """
 
@@ -500,7 +517,7 @@ def docker_logs(
         )
 
         logs_cmd = f"""
-cd {resolved_dir}
+    cd "{resolved_dir}"
 sudo docker compose logs {follow_flag} --tail {tail} {service_str}
 """
 
@@ -561,7 +578,7 @@ def restart(app_dir: str | None, service: str | None) -> None:
         )
 
         restart_cmd = f"""
-cd {resolved_dir}
+    cd "{resolved_dir}"
 sudo docker compose restart {service_str}
 echo "Restart complete. Current status:"
 sudo docker compose ps
