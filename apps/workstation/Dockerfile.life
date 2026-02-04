@@ -1,0 +1,65 @@
+# Life Container - Operator Zone
+#
+# Supervised LLM tooling and workflows environment.
+# Trust level: operator (you are actively watching)
+#
+# Capabilities:
+# - code-server for web-based editing
+# - Claude Code CLI for LLM-assisted development
+# - Read access to agent app area for review
+# - Full access to shared /workspace
+
+FROM codercom/code-server:latest
+
+USER root
+
+# Install base development tools
+RUN apt-get update && apt-get install -y \
+    bash \
+    git \
+    curl \
+    wget \
+    ca-certificates \
+    gnupg \
+    python3 \
+    python3-pip \
+    python3-venv \
+    jq \
+    ripgrep \
+    fd-find \
+    tree \
+    htop \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js (LTS) for Claude Code and other tooling
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install gcloud SDK for GCP access
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | \
+    tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | \
+    gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg && \
+    apt-get update && apt-get install -y google-cloud-cli && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create directories for agent app area mounts
+RUN mkdir -p /agent/state /agent/outbox /agent/repo
+
+USER coder
+
+# Install Claude Code CLI globally
+RUN npm install -g @anthropic-ai/claude-code
+
+# Copy entrypoint script
+COPY --chown=coder:coder entrypoint-life.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+WORKDIR /workspace
+
+# Environment marker for zone identification
+ENV ZONE=life
+ENV TRUST_LEVEL=operator
+
+ENTRYPOINT ["/entrypoint.sh"]
