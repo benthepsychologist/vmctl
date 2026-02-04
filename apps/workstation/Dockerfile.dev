@@ -16,9 +16,12 @@ USER root
 
 # Install comprehensive development tools
 RUN apt-get update && apt-get install -y \
+    bash \
     git \
     curl \
     wget \
+    ca-certificates \
+    gnupg \
     python3 \
     python3-pip \
     python3-venv \
@@ -48,8 +51,9 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
     rm -rf /var/lib/apt/lists/*
 
 # Install Docker CLI (for managing host Docker if socket is mounted)
-RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" | \
+RUN . /etc/os-release && \
+    curl -fsSL "https://download.docker.com/linux/${ID}/gpg" | gpg --dearmor -o /usr/share/keyrings/docker.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" | \
     tee /etc/apt/sources.list.d/docker.list > /dev/null && \
     apt-get update && apt-get install -y docker-ce-cli docker-compose-plugin && \
     rm -rf /var/lib/apt/lists/*

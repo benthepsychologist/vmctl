@@ -56,11 +56,15 @@ Builder environment for development:
 ## Volumes
 
 ```
-/workspace          → /mnt/home/user/workspace (shared)
-/agent/state        → /mnt/home/user/agent-data/state
-/agent/outbox       → /mnt/home/user/agent-data/outbox
-/agent/repo         → /mnt/home/user/agent-data/repo
+/workspace          → /workspace (shared, default)
+/agent/state        → /srv/vmctl/agent/state (default)
+/agent/outbox       → /srv/vmctl/agent/outbox (default)
+/agent/repo         → /srv/vmctl/agent/repo (default)
 ```
+
+These host paths are configurable via Compose env interpolation:
+- `WORKSPACE_HOST_DIR` (default `/workspace`)
+- `AGENT_HOST_DIR` (default `/srv/vmctl/agent`)
 
 ## Management
 
@@ -80,6 +84,11 @@ vmctl restart dev
 ```
 
 ## Customization
+
+### Security note (code-server)
+
+By default the compose file binds ports to `127.0.0.1` only. This is intentional because the entrypoints run code-server with `--auth none`.
+Use SSH/IAP tunneling for remote access, or deliberately change the port bindings if you have other protections in place.
 
 ### Init Scripts
 

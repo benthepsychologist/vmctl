@@ -11,8 +11,8 @@ set -e
 echo "Workstation deploy hook: Setting up directories..."
 
 # Base paths (on the VM host)
-WORKSPACE_DIR="/mnt/home/user/workspace"
-AGENT_DATA_DIR="/mnt/home/user/agent-data"
+WORKSPACE_DIR="${WORKSPACE_HOST_DIR:-/workspace}"
+AGENT_DATA_DIR="${AGENT_HOST_DIR:-/srv/vmctl/agent}"
 
 # Create shared workspace directory
 if [ ! -d "$WORKSPACE_DIR" ]; then
@@ -34,7 +34,7 @@ done
 # Default to current user
 OWNER="${SUDO_USER:-$(whoami)}"
 echo "Setting ownership to: $OWNER"
-chown -R "$OWNER:$OWNER" "$WORKSPACE_DIR" 2>/dev/null || true
+chown "$OWNER:$OWNER" "$WORKSPACE_DIR" 2>/dev/null || true
 chown -R "$OWNER:$OWNER" "$AGENT_DATA_DIR" 2>/dev/null || true
 
 # Optionally pull latest changes if this is a git repo

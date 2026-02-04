@@ -15,7 +15,7 @@ services:
     container_name: life
     hostname: life
     ports:
-      - "8080:8080"   # code-server
+      - "127.0.0.1:8080:8080"   # code-server (localhost-only by default)
     volumes:
       # Shared workspace - visible to both life and dev
       - workspace:/workspace
@@ -38,7 +38,7 @@ services:
     container_name: dev
     hostname: dev
     ports:
-      - "8081:8080"   # code-server (different port)
+      - "127.0.0.1:8081:8080"   # code-server (localhost-only by default)
     volumes:
       # Shared workspace - visible to both life and dev
       - workspace:/workspace
@@ -64,7 +64,7 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /mnt/home/user/workspace
+      device: ${WORKSPACE_HOST_DIR:-/workspace}
 
   # Agent app area volumes - isolated from agent's /workspace access
   # These can be bind-mounted from a separate agent data directory
@@ -73,18 +73,18 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /mnt/home/user/agent-data/state
+      device: ${AGENT_HOST_DIR:-/srv/vmctl/agent}/state
 
   agent-outbox:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/home/user/agent-data/outbox
+      device: ${AGENT_HOST_DIR:-/srv/vmctl/agent}/outbox
 
   agent-repo:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/home/user/agent-data/repo
+      device: ${AGENT_HOST_DIR:-/srv/vmctl/agent}/repo
