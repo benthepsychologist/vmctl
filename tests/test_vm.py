@@ -221,3 +221,56 @@ class TestVMManager:
         call_args = mock_run.call_args[0][0]
         assert "--delete-disks=boot" in call_args
         assert "--quiet" in call_args
+
+    @patch("vmctl.core.vm.run_command")
+    def test_ssh_exec_success(self, mock_run: MagicMock, vm_manager: VMManager) -> None:
+        """Test ssh_exec with successful command."""
+        mock_run.return_value = CommandResult(0, "output text", "")
+        success, stdout, stderr = vm_manager.ssh_exec("echo hello")
+
+        assert success is True
+        assert stdout == "output text"
+        assert stderr == ""
+
+        expected_cmd = [
+            "gcloud",
+            "compute",
+            "ssh",
+            "test-vm",
+            "--zone=us-central1-a",
+            "--project=test-project",
+            "--tunnel-through-iap",
+            "--command",
+            "echo hello",
+        ]
+        mock_run.assert_called_once_with(expected_cmd, check=False)
+
+    @patch("vmctl.core.vm.run_command")
+    def test_ssh_exec_failure(self, mock_run: MagicMock, vm_manager: VMManager) -> None:
+        """Test ssh_exec with failed command."""
+        mock_run.return_value = CommandResult(1, "", "command not found")
+        success, stdout, stderr = vm_manager.ssh_exec("bad-command")
+
+        assert success is False
+        assert stdout == ""
+        assert stderr == "command not found"
+
+    @patch("vmctl.core.vm.run_command")
+    def test_ssh_exec_multiline_script(
+        self, mock_run: MagicMock, vm_manager: VMManager
+    ) -> None:
+        """Test ssh_exec with multiline script."""
+        mock_run.return_value = CommandResult(0, "line1\nline2", "")
+        script = """
+set -e
+echo "hello"
+echo "world"
+"""
+        success, stdout, stderr = vm_manager.ssh_exec(script)
+
+        assert success is True
+        assert stdout == "line1\nline2"
+        # Verify the script was passed as the command
+        call_args = mock_run.call_args[0][0]
+        assert "--command" in call_args
+        assert script in call_args

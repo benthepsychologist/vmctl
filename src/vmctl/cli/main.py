@@ -59,6 +59,13 @@ cli.add_command(backup_commands.snapshots)
 cli.add_command(docker_commands.up)
 cli.add_command(docker_commands.down)
 
+# Docker management commands (Gate 2)
+cli.add_command(docker_commands.provision)
+cli.add_command(docker_commands.deploy)
+cli.add_command(docker_commands.docker_ps)
+cli.add_command(docker_commands.docker_logs)
+cli.add_command(docker_commands.restart)
+
 
 if __name__ == "__main__":
     cli()
