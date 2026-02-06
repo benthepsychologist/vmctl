@@ -1,62 +1,78 @@
 #!/bin/bash
 # Deploy hook for molt-gateway agent zone app
 #
-# This script runs before `docker compose up` to ensure
-# all required directories exist with correct permissions.
+# This script runs before `docker compose up` as a preflight.
 #
-# Called by: vmctl deploy --app-dir /srv/vmctl/agent/molt-gateway/app
+# IMPORTANT: vmctl runs this hook without sudo. Do not attempt
+# privileged operations here. Instead, validate prerequisites and
+# fail fast with clear instructions.
+#
+# Called by: vmctl deploy --app-dir /srv/vmctl/apps/molt-gateway
 
-set -e
+set -euo pipefail
 
-echo "molt-gateway deploy hook: Setting up agent zone directories..."
+echo "molt-gateway deploy hook: Preflight checks..."
 
-# Canonical host layout for molt-gateway
+# Canonical host layout for molt-gateway agent data
 BASE_DIR="/srv/vmctl/agent/molt-gateway"
 
-# Create all required directories
-for subdir in repo outbox state app secrets; do
-    dir="$BASE_DIR/$subdir"
+missing=0
+
+require_dir() {
+    local dir="$1"
     if [ ! -d "$dir" ]; then
-        echo "Creating directory: $dir"
-        mkdir -p "$dir"
+        echo "ERROR: Missing required directory: $dir" >&2
+        missing=1
     fi
-done
+}
 
-# Set permissions
-# - outbox/state: world-writable (container runs as non-root)
-# - secrets: restricted (600, root-owned)
-OWNER="${SUDO_USER:-$(whoami)}"
-echo "Setting ownership to: $OWNER"
-chown -R "$OWNER:$OWNER" "$BASE_DIR" 2>/dev/null || true
+require_file_exists() {
+    local file="$1"
+    if [ ! -f "$file" ]; then
+        echo "ERROR: Missing required file: $file" >&2
+        missing=1
+    fi
+}
 
-# Make outbox and state writable by container (which runs as non-root)
-chmod 777 "$BASE_DIR/outbox" 2>/dev/null || true
-chmod 777 "$BASE_DIR/state" 2>/dev/null || true
+require_dir "$BASE_DIR/repo"
+require_dir "$BASE_DIR/outbox"
+require_dir "$BASE_DIR/state"
+require_dir "$BASE_DIR/secrets"
 
-# Secure the secrets directory
-chmod 700 "$BASE_DIR/secrets" 2>/dev/null || true
+require_file_exists "$BASE_DIR/secrets/agent.env"
 
-# Ensure agent.env exists (even if empty) to prevent compose errors
-if [ ! -f "$BASE_DIR/secrets/agent.env" ]; then
-    echo "Creating empty agent.env (add granted tokens before deploying)"
-    touch "$BASE_DIR/secrets/agent.env"
-    chmod 600 "$BASE_DIR/secrets/agent.env"
-    chown root:root "$BASE_DIR/secrets/agent.env" 2>/dev/null || true
+if [ -f "$BASE_DIR/secrets/agent.env" ] && [ ! -r "$BASE_DIR/secrets/agent.env" ]; then
+    echo "WARN: agent.env is not readable by current user; this is OK if docker compose runs via sudo." >&2
 fi
 
-# Clone or update the molt-gateway repo if not present
-if [ ! -d "$BASE_DIR/repo/.git" ]; then
-    echo "Note: molt-gateway repo not found at $BASE_DIR/repo"
-    echo "Clone the repo before deploying:"
-    echo "  git clone <molt-gateway-url> $BASE_DIR/repo"
-else
-    echo "Updating molt-gateway repo..."
-    (cd "$BASE_DIR/repo" && git pull --ff-only 2>/dev/null) || echo "Git pull skipped"
+if [ -d "$BASE_DIR/repo" ] && [ ! -f "$BASE_DIR/repo/Dockerfile" ]; then
+    echo "WARN: No Dockerfile found at $BASE_DIR/repo/Dockerfile; compose build may fail." >&2
 fi
 
-echo "Deploy hook complete."
-echo ""
-echo "Next steps:"
-echo "  1. Ensure molt-gateway repo is cloned to $BASE_DIR/repo"
-echo "  2. Add granted tokens to $BASE_DIR/secrets/agent.env"
-echo "  3. Build the molt-gateway image (if not using registry)"
+if [ "$missing" -ne 0 ]; then
+    cat >&2 <<EOF
+
+Preflight failed.
+
+Expected canonical layout:
+  /srv/vmctl/apps/molt-gateway/              (compose app dir; this directory)
+  /srv/vmctl/agent/molt-gateway/repo/        (molt-gateway git checkout)
+  /srv/vmctl/agent/molt-gateway/outbox/      (RW outbox)
+  /srv/vmctl/agent/molt-gateway/state/       (RW state)
+  /srv/vmctl/agent/molt-gateway/secrets/agent.env
+
+Fix on the VM (example):
+  sudo mkdir -p /srv/vmctl/agent/molt-gateway/{repo,outbox,state,secrets}
+  sudo touch /srv/vmctl/agent/molt-gateway/secrets/agent.env
+  sudo chmod 600 /srv/vmctl/agent/molt-gateway/secrets/agent.env
+  sudo chown root:root /srv/vmctl/agent/molt-gateway/secrets/agent.env
+  sudo chmod 777 /srv/vmctl/agent/molt-gateway/{outbox,state}
+
+Then ensure the repo exists:
+  sudo git clone <molt-gateway-url> /srv/vmctl/agent/molt-gateway/repo
+
+EOF
+    exit 1
+fi
+
+echo "Preflight OK. Proceeding with docker compose."

@@ -9,7 +9,9 @@
 
 services:
   molt:
-    image: molt-gateway:latest
+    image: molt-gateway:agent
+    build:
+      context: /srv/vmctl/agent/molt-gateway/repo
     container_name: molt-gateway
     hostname: molt
 
@@ -49,5 +51,5 @@ services:
 networks:
   agent:
     driver: bridge
-    # Note: NOT internal - agent needs outbound access to APIs (Slack, etc.)
+    # Note: NOT internal - agent needs outbound access to channel APIs.
     # Inbound access is blocked by not exposing ports

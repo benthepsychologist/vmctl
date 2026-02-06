@@ -12,13 +12,19 @@ This app enforces a one-way filesystem boundary:
 ## Host Layout
 
 ```
-/srv/vmctl/agent/molt-gateway/
-├── repo/           # Git checkout of molt-gateway (agent sees as /app:ro)
-├── outbox/         # Cross-zone artifact channel (agent sees as /outbox:rw)
-├── state/          # Runtime state - sqlite, caches (agent sees as /state:rw)
-├── app/            # This compose app directory (vmctl deploy target)
-└── secrets/
-    └── agent.env   # Granted tokens only (chmod 600, root-owned)
+/srv/vmctl/
+├── apps/
+│   └── molt-gateway/        # Compose app directory (vmctl --app-dir target)
+│       ├── compose.yml
+│       ├── deploy.sh
+│       └── agent.env.example
+└── agent/
+    └── molt-gateway/
+        ├── repo/            # Git checkout of molt-gateway (agent sees as /app:ro)
+        ├── outbox/          # Cross-zone artifact channel (agent sees as /outbox:rw)
+        ├── state/           # Runtime state - sqlite, caches (agent sees as /state:rw)
+        └── secrets/
+            └── agent.env    # Granted tokens only (chmod 600, root-owned)
 ```
 
 ## Deployment
@@ -26,44 +32,37 @@ This app enforces a one-way filesystem boundary:
 ### Day 1: Initial Setup
 
 ```bash
-# 1. Create directories on VM
-sudo mkdir -p /srv/vmctl/agent/molt-gateway/{repo,outbox,state,app,secrets}
+# 1. Create agent directories on VM
+sudo mkdir -p /srv/vmctl/agent/molt-gateway/{repo,outbox,state,secrets}
 
-# 2. Clone molt-gateway repo
-git clone <molt-gateway-url> /srv/vmctl/agent/molt-gateway/repo
+# 2. Clone molt-gateway repo (or otherwise place a checkout at this path)
+sudo git clone <molt-gateway-url> /srv/vmctl/agent/molt-gateway/repo
 
-# 3. Copy this app to the VM
-# (or clone/copy the compose files to /srv/vmctl/agent/molt-gateway/app)
-
-# 4. Add granted tokens
-sudo cp agent.env.example /srv/vmctl/agent/molt-gateway/secrets/agent.env
+# 3. Add granted tokens
+sudo cp /srv/vmctl/apps/molt-gateway/agent.env.example /srv/vmctl/agent/molt-gateway/secrets/agent.env
 sudo chmod 600 /srv/vmctl/agent/molt-gateway/secrets/agent.env
 sudo chown root:root /srv/vmctl/agent/molt-gateway/secrets/agent.env
 # Edit to add actual tokens
 
-# 5. Build the molt-gateway image (if not using registry)
-cd /srv/vmctl/agent/molt-gateway/repo
-docker build -t molt-gateway:latest .
-
-# 6. Deploy
-vmctl deploy --app-dir /srv/vmctl/agent/molt-gateway/app
+# 4. Deploy (compose app dir)
+vmctl deploy --app-dir /srv/vmctl/apps/molt-gateway
 ```
 
 ### Day N: Operations
 
 ```bash
 # Check status
-vmctl ps --app-dir /srv/vmctl/agent/molt-gateway/app
+vmctl ps --app-dir /srv/vmctl/apps/molt-gateway
 
 # View logs
-vmctl logs --app-dir /srv/vmctl/agent/molt-gateway/app
-vmctl logs -f --app-dir /srv/vmctl/agent/molt-gateway/app  # follow
+vmctl logs --app-dir /srv/vmctl/apps/molt-gateway
+vmctl logs -f --app-dir /srv/vmctl/apps/molt-gateway  # follow
 
 # Restart
-vmctl restart --app-dir /srv/vmctl/agent/molt-gateway/app
+vmctl restart --app-dir /srv/vmctl/apps/molt-gateway
 
 # Redeploy (after repo update)
-vmctl deploy --app-dir /srv/vmctl/agent/molt-gateway/app
+vmctl deploy --app-dir /srv/vmctl/apps/molt-gateway
 ```
 
 ## Security Constraints
