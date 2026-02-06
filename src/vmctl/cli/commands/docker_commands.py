@@ -12,6 +12,12 @@ from vmctl.core.vm import VMManager
 
 console = Console()
 
+# Default apps to deploy in order (dependencies first)
+DEFAULT_APPS = ["molt-gateway", "workstation"]
+
+# Base directory for vmctl on the VM
+VM_BASE_DIR = "/srv/vmctl"
+
 
 def run_command(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
     """Run a command and return exit code, stdout, stderr.
@@ -595,6 +601,328 @@ sudo docker compose ps
             if stderr:
                 console.print(f"[red]{stderr}[/red]")
             raise click.Abort()
+
+    except VMError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise click.Abort() from None
+
+
+# ============================================================================
+# Multi-App Setup Command (Gate 5)
+# ============================================================================
+
+
+def _find_local_apps_dir() -> Path:
+    """Find the local apps directory.
+
+    Searches in order:
+    1. Package-relative location (pip install)
+    2. Current working directory (development)
+
+    Returns:
+        Path to apps directory
+
+    Raises:
+        click.Abort: If apps directory not found
+    """
+    # Try package-relative path (for pip install)
+    package_apps = Path(__file__).parent.parent.parent / "apps"
+    if package_apps.exists() and package_apps.is_dir():
+        return package_apps
+
+    # Try current working directory (for development)
+    cwd_apps = Path.cwd() / "apps"
+    if cwd_apps.exists() and cwd_apps.is_dir():
+        return cwd_apps
+
+    console.print("[red]Error: apps directory not found.[/red]")
+    console.print("Searched in:")
+    console.print(f"  - {package_apps}")
+    console.print(f"  - {cwd_apps}")
+    raise click.Abort()
+
+
+def _setup_molt_directories(vm: VMManager) -> bool:
+    """Pre-create required molt-gateway agent directories on VM.
+
+    Creates the directory structure that molt-gateway expects:
+    /srv/vmctl/agent/molt-gateway/{repo,outbox,state,secrets}
+
+    Args:
+        vm: VM manager instance
+
+    Returns:
+        True if successful, False otherwise
+    """
+
+    mkdir_script = f"""
+set -e
+sudo mkdir -p {VM_BASE_DIR}/agent/molt-gateway/repo
+sudo mkdir -p {VM_BASE_DIR}/agent/molt-gateway/outbox
+sudo mkdir -p {VM_BASE_DIR}/agent/molt-gateway/state
+sudo mkdir -p {VM_BASE_DIR}/agent/molt-gateway/secrets
+sudo mkdir -p {VM_BASE_DIR}/apps
+
+# Create placeholder agent.env if it doesn't exist (required by molt-gateway deploy.sh)
+if [ ! -f {VM_BASE_DIR}/agent/molt-gateway/secrets/agent.env ]; then
+    sudo touch {VM_BASE_DIR}/agent/molt-gateway/secrets/agent.env
+    sudo chmod 600 {VM_BASE_DIR}/agent/molt-gateway/secrets/agent.env
+fi
+
+# Set ownership to current user for app deployment
+sudo chown -R $USER:$USER {VM_BASE_DIR}
+
+echo "Agent directories created:"
+ls -la {VM_BASE_DIR}/agent/molt-gateway/
+"""
+
+    success, stdout, stderr = vm.ssh_exec(mkdir_script)
+
+    if success:
+        console.print("[green]✓ Agent directories created[/green]")
+        if stdout:
+            console.print(f"[dim]{stdout}[/dim]")
+    else:
+        console.print("[red]Failed to create agent directories[/red]")
+        if stderr:
+            console.print(f"[red]{stderr}[/red]")
+
+    return success
+
+
+def _sync_app(vm: VMManager, local_apps_dir: Path, app_name: str) -> bool:
+    """Sync a single app directory to the VM.
+
+    Args:
+        vm: VM manager instance
+        local_apps_dir: Path to local apps directory
+        app_name: Name of the app to sync
+
+    Returns:
+        True if successful, False otherwise
+    """
+    local_app_path = local_apps_dir / app_name
+    if not local_app_path.exists():
+        console.print(f"[red]App directory not found: {local_app_path}[/red]")
+        return False
+
+    remote_app_path = f"{VM_BASE_DIR}/apps/{app_name}"
+
+    console.print(f"[bold cyan]Syncing {app_name}...[/bold cyan]")
+
+    # First ensure the remote directory exists
+    success, _, stderr = vm.ssh_exec(f"mkdir -p {remote_app_path}")
+    if not success:
+        console.print(f"[red]Failed to create remote directory: {stderr}[/red]")
+        return False
+
+    # Copy the app directory contents
+    success, stdout, stderr = vm.scp(
+        f"{local_app_path}/", remote_app_path, recursive=True
+    )
+
+    if success:
+        console.print(f"[green]✓ {app_name} synced to {remote_app_path}[/green]")
+    else:
+        console.print(f"[red]Failed to sync {app_name}[/red]")
+        if stderr:
+            console.print(f"[red]{stderr}[/red]")
+
+    return success
+
+
+def _deploy_app(vm: VMManager, app_name: str) -> bool:
+    """Deploy a single app on the VM.
+
+    Args:
+        vm: VM manager instance
+        app_name: Name of the app to deploy
+
+    Returns:
+        True if successful, False otherwise
+    """
+    remote_app_path = f"{VM_BASE_DIR}/apps/{app_name}"
+
+    console.print(f"[bold cyan]Deploying {app_name}...[/bold cyan]")
+
+    deploy_script = f"""
+set -e
+cd "{remote_app_path}"
+
+# Run deploy.sh if it exists (app-owned validation)
+if [ -f ./deploy.sh ]; then
+    echo "Running deploy.sh..."
+    bash ./deploy.sh
+fi
+
+# Check for compose file
+if [ ! -f docker-compose.yml ] && [ ! -f docker-compose.yaml ] && \
+   [ ! -f compose.yml ] && [ ! -f compose.yaml ]; then
+    echo "Error: No compose file found in {remote_app_path}"
+    exit 1
+fi
+
+echo "Running docker compose up -d --build..."
+sudo docker compose up -d --build
+
+echo "Deployment complete. Running containers:"
+sudo docker compose ps
+"""
+
+    success, stdout, stderr = vm.ssh_exec(deploy_script)
+
+    if success:
+        console.print(f"[green]✓ {app_name} deployed successfully[/green]")
+        if stdout:
+            console.print(f"[dim]{stdout}[/dim]")
+    else:
+        console.print(f"[red]Failed to deploy {app_name}[/red]")
+        if stderr:
+            console.print(f"[red]{stderr}[/red]")
+
+    return success
+
+
+@click.command()
+@click.option(
+    "--apps",
+    help="Comma-separated list of apps to deploy (default: molt-gateway,workstation)",
+)
+@click.option(
+    "--skip-provision",
+    is_flag=True,
+    help="Skip Docker provisioning (assumes Docker is already installed)",
+)
+def setup(apps: str | None, skip_provision: bool) -> None:
+    """Set up the VM with multiple apps in one operation.
+
+    This command orchestrates the full deployment of multiple apps:
+    1. Optionally provisions Docker on the VM
+    2. Creates required agent directories
+    3. Syncs app directories from local to VM via scp
+    4. Deploys apps in dependency order
+
+    Apps are deployed to /srv/vmctl/apps/{app-name}/ on the VM.
+    Agent directories are created at /srv/vmctl/agent/molt-gateway/.
+
+    Examples:
+        vmctl setup                           # Deploy default apps
+        vmctl setup --apps molt-gateway       # Deploy specific app
+        vmctl setup --skip-provision          # Skip Docker install
+    """
+    try:
+        vm, config_mgr = _get_vm_manager()
+        _check_vm_running(vm)
+
+        # Parse apps list
+        if apps:
+            app_list = [a.strip() for a in apps.split(",")]
+        else:
+            app_list = DEFAULT_APPS
+
+        console.print(
+            f"[bold cyan]Setting up VM {vm.config.vm_name} with apps: "
+            f"{', '.join(app_list)}[/bold cyan]"
+        )
+
+        # Find local apps directory
+        local_apps_dir = _find_local_apps_dir()
+        console.print(f"[dim]Using local apps from: {local_apps_dir}[/dim]")
+
+        # Validate all apps exist locally before starting
+        for app_name in app_list:
+            app_path = local_apps_dir / app_name
+            if not app_path.exists():
+                console.print(
+                    f"[red]Error: App '{app_name}' not found at {app_path}[/red]"
+                )
+                raise click.Abort()
+
+        # Step 1: Provision Docker if not skipped
+        if not skip_provision:
+            console.print("\n[bold]Step 1: Provisioning Docker...[/bold]")
+            # Check if Docker is already installed
+            check_result, stdout, _ = vm.ssh_exec("command -v docker")
+            if check_result and stdout.strip():
+                console.print("[green]✓ Docker already installed[/green]")
+            else:
+                # Run provision
+                provision_script = """
+set -e
+
+# Ensure curl/git exist
+if ! command -v curl >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then
+    sudo apt-get update -y
+    sudo apt-get install -y curl git
+fi
+
+# Install Docker
+echo "Installing Docker..."
+curl -fsSL https://get.docker.com | sudo sh
+echo "Docker installed successfully"
+
+# Add current user to docker group
+sudo usermod -aG docker $USER
+
+# Ensure Docker service is running
+sudo systemctl enable docker
+sudo systemctl start docker
+
+# Verify Docker is working
+echo "Verifying Docker installation..."
+sudo docker --version
+sudo docker compose version
+
+echo "Provisioning complete!"
+"""
+                success, stdout, stderr = vm.ssh_exec(provision_script)
+                if not success:
+                    console.print("[red]Failed to provision Docker[/red]")
+                    if stderr:
+                        console.print(f"[red]{stderr}[/red]")
+                    raise click.Abort()
+                console.print("[green]✓ Docker provisioned[/green]")
+        else:
+            console.print("\n[bold]Step 1: Skipping Docker provisioning[/bold]")
+
+        # Step 2: Create agent directories
+        console.print("\n[bold]Step 2: Creating agent directories...[/bold]")
+        if not _setup_molt_directories(vm):
+            raise click.Abort()
+
+        # Step 3 & 4: Sync and deploy each app in order
+        for i, app_name in enumerate(app_list, start=1):
+            console.print(f"\n[bold]Step {2 + i}a: Syncing {app_name}...[/bold]")
+            if not _sync_app(vm, local_apps_dir, app_name):
+                raise click.Abort()
+
+            console.print(f"\n[bold]Step {2 + i}b: Deploying {app_name}...[/bold]")
+            if not _deploy_app(vm, app_name):
+                raise click.Abort()
+
+        # Final status
+        console.print("\n" + "=" * 60)
+        console.print("[bold green]✓ Setup complete![/bold green]")
+        console.print(f"Apps deployed to: {VM_BASE_DIR}/apps/")
+        console.print(f"Agent directories: {VM_BASE_DIR}/agent/molt-gateway/")
+
+        # Warn about agent.env configuration if molt-gateway was deployed
+        if "molt-gateway" in app_list:
+            console.print(
+                "\n[yellow]Note:[/yellow] Configure agent.env before using molt-gateway:"
+            )
+            console.print(
+                f"  vmctl ssh -- 'sudo nano {VM_BASE_DIR}/agent/molt-gateway/secrets/agent.env'"
+            )
+            console.print(
+                f"  See: {VM_BASE_DIR}/apps/molt-gateway/agent.env.example"
+            )
+
+        console.print("\nUseful commands:")
+        for app_name in app_list:
+            remote_path = f"{VM_BASE_DIR}/apps/{app_name}"
+            console.print(f"  vmctl ps --app-dir {remote_path}")
+        console.print("=" * 60)
 
     except VMError as e:
         console.print(f"[red]Error: {e}[/red]")

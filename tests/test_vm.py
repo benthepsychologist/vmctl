@@ -274,3 +274,59 @@ echo "world"
         call_args = mock_run.call_args[0][0]
         assert "--command" in call_args
         assert script in call_args
+
+    @patch("vmctl.core.vm.run_command")
+    def test_scp_file_success(self, mock_run: MagicMock, vm_manager: VMManager) -> None:
+        """Test scp single file to VM."""
+        mock_run.return_value = CommandResult(0, "", "")
+        success, stdout, stderr = vm_manager.scp("/local/file.txt", "/remote/file.txt")
+
+        assert success is True
+        assert stdout == ""
+        assert stderr == ""
+
+        expected_cmd = [
+            "gcloud",
+            "compute",
+            "scp",
+            "/local/file.txt",
+            "test-vm:/remote/file.txt",
+            "--zone=us-central1-a",
+            "--project=test-project",
+            "--tunnel-through-iap",
+        ]
+        mock_run.assert_called_once_with(expected_cmd, check=False)
+
+    @patch("vmctl.core.vm.run_command")
+    def test_scp_directory_recursive(
+        self, mock_run: MagicMock, vm_manager: VMManager
+    ) -> None:
+        """Test scp directory with recursive flag."""
+        mock_run.return_value = CommandResult(0, "", "")
+        success, stdout, stderr = vm_manager.scp(
+            "/local/dir", "/remote/dir", recursive=True
+        )
+
+        assert success is True
+
+        expected_cmd = [
+            "gcloud",
+            "compute",
+            "scp",
+            "--recurse",
+            "/local/dir",
+            "test-vm:/remote/dir",
+            "--zone=us-central1-a",
+            "--project=test-project",
+            "--tunnel-through-iap",
+        ]
+        mock_run.assert_called_once_with(expected_cmd, check=False)
+
+    @patch("vmctl.core.vm.run_command")
+    def test_scp_failure(self, mock_run: MagicMock, vm_manager: VMManager) -> None:
+        """Test scp with failure."""
+        mock_run.return_value = CommandResult(1, "", "Permission denied")
+        success, stdout, stderr = vm_manager.scp("/local/file.txt", "/remote/file.txt")
+
+        assert success is False
+        assert stderr == "Permission denied"

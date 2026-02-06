@@ -66,6 +66,9 @@ cli.add_command(docker_commands.docker_ps)
 cli.add_command(docker_commands.docker_logs)
 cli.add_command(docker_commands.restart)
 
+# Multi-app setup command (Gate 5)
+cli.add_command(docker_commands.setup)
+
 
 if __name__ == "__main__":
     cli()

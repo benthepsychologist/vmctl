@@ -201,6 +201,38 @@ class VMManager:
         result = run_command(cmd, check=False)
         return result.success, result.stdout, result.stderr
 
+    def scp(
+        self, local_path: str, remote_path: str, recursive: bool = False
+    ) -> tuple[bool, str, str]:
+        """Copy files to VM via gcloud compute scp.
+
+        Args:
+            local_path: Local file or directory path
+            remote_path: Remote destination path on VM
+            recursive: If True, copy directories recursively
+
+        Returns:
+            Tuple of (success, stdout, stderr)
+        """
+        cmd = [
+            "gcloud",
+            "compute",
+            "scp",
+        ]
+        if recursive:
+            cmd.append("--recurse")
+        cmd.extend(
+            [
+                local_path,
+                f"{self.config.vm_name}:{remote_path}",
+                f"--zone={self.config.zone}",
+                f"--project={self.config.project}",
+                "--tunnel-through-iap",
+            ]
+        )
+        result = run_command(cmd, check=False)
+        return result.success, result.stdout, result.stderr
+
     def logs(self, log_file: str = "/var/log/vm-auto-shutdown.log") -> str:
         """Get logs from VM.
 

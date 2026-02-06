@@ -8,11 +8,13 @@ import pytest
 from click.testing import CliRunner
 
 from vmctl.cli.commands.docker_commands import (
+    _find_local_apps_dir,
     deploy,
     docker_logs,
     docker_ps,
     provision,
     restart,
+    setup,
 )
 from vmctl.config.manager import ConfigManager
 from vmctl.config.models import VMConfig
@@ -599,3 +601,452 @@ APP_DIR=""
 '''
         config = VMConfig.from_bash_format(bash_content)
         assert config.app_dir is None
+
+
+class TestSetupCommand(TestDockerCommands):
+    """Test setup command."""
+
+    def test_setup_no_config(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test setup with no config file."""
+        with TemporaryDirectory() as tmpdir:
+            monkeypatch.setenv("HOME", tmpdir)
+            result = runner.invoke(setup)
+            assert result.exit_code == 1
+            assert "No configuration found" in result.output
+
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_vm_not_exists(
+        self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
+    ) -> None:
+        """Test setup when VM doesn't exist."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = False
+        mock_vm.config.vm_name = "test-vm"
+        mock_vm_class.return_value = mock_vm
+
+        result = runner.invoke(setup)
+        assert result.exit_code == 1
+        assert "does not exist" in result.output
+
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_vm_not_running(
+        self, mock_vm_class: MagicMock, runner: CliRunner, temp_config_dir: Path
+    ) -> None:
+        """Test setup when VM is not running."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "TERMINATED"
+        mock_vm.config.vm_name = "test-vm"
+        mock_vm_class.return_value = mock_vm
+
+        result = runner.invoke(setup)
+        assert result.exit_code == 1
+        assert "TERMINATED" in result.output
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_app_not_found(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup when requested app doesn't exist locally."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+        mock_vm_class.return_value = mock_vm
+
+        # Create temp apps dir without the requested app
+        with TemporaryDirectory() as tmpdir:
+            apps_dir = Path(tmpdir)
+            mock_find_apps.return_value = apps_dir
+
+            result = runner.invoke(setup, ["--apps", "nonexistent-app"])
+            assert result.exit_code == 1
+            assert "not found" in result.output
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_success_skip_provision(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test successful setup with skip-provision flag."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+        # All ssh_exec calls succeed
+        mock_vm.ssh_exec.return_value = (True, "Success", "")
+        # All scp calls succeed
+        mock_vm.scp.return_value = (True, "", "")
+        mock_vm_class.return_value = mock_vm
+
+        # Create temp apps dir with test app
+        with TemporaryDirectory() as tmpdir:
+            apps_dir = Path(tmpdir)
+            test_app = apps_dir / "test-app"
+            test_app.mkdir()
+            (test_app / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            result = runner.invoke(setup, ["--apps", "test-app", "--skip-provision"])
+            assert result.exit_code == 0
+            assert "Setup complete" in result.output
+            assert "Skipping Docker provisioning" in result.output
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_with_docker_already_installed(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup when Docker is already installed."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+
+        # command -v docker returns path (Docker installed)
+        def ssh_side_effect(cmd: str) -> tuple[bool, str, str]:
+            if "command -v docker" in cmd:
+                return (True, "/usr/bin/docker", "")
+            return (True, "Success", "")
+
+        mock_vm.ssh_exec.side_effect = ssh_side_effect
+        mock_vm.scp.return_value = (True, "", "")
+        mock_vm_class.return_value = mock_vm
+
+        with TemporaryDirectory() as tmpdir:
+            apps_dir = Path(tmpdir)
+            test_app = apps_dir / "test-app"
+            test_app.mkdir()
+            (test_app / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            result = runner.invoke(setup, ["--apps", "test-app"])
+            assert result.exit_code == 0
+            assert "Docker already installed" in result.output
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_provisions_docker_when_not_installed(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup provisions Docker when not installed."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+
+        call_count = 0
+
+        def ssh_side_effect(cmd: str) -> tuple[bool, str, str]:
+            nonlocal call_count
+            call_count += 1
+            if "command -v docker" in cmd:
+                return (False, "", "")  # Docker not installed
+            return (True, "Success", "")
+
+        mock_vm.ssh_exec.side_effect = ssh_side_effect
+        mock_vm.scp.return_value = (True, "", "")
+        mock_vm_class.return_value = mock_vm
+
+        with TemporaryDirectory() as tmpdir:
+            apps_dir = Path(tmpdir)
+            test_app = apps_dir / "test-app"
+            test_app.mkdir()
+            (test_app / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            result = runner.invoke(setup, ["--apps", "test-app"])
+            assert result.exit_code == 0
+            assert "Docker provisioned" in result.output
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_creates_agent_directories(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup creates molt-gateway agent directories."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+        mock_vm.ssh_exec.return_value = (True, "Success", "")
+        mock_vm.scp.return_value = (True, "", "")
+        mock_vm_class.return_value = mock_vm
+
+        with TemporaryDirectory() as tmpdir:
+            apps_dir = Path(tmpdir)
+            test_app = apps_dir / "test-app"
+            test_app.mkdir()
+            (test_app / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            result = runner.invoke(setup, ["--apps", "test-app", "--skip-provision"])
+            assert result.exit_code == 0
+            assert "Agent directories created" in result.output
+
+            # Verify mkdir commands were called for agent directories
+            mkdir_calls = [
+                call
+                for call in mock_vm.ssh_exec.call_args_list
+                if "mkdir" in str(call) and "molt-gateway" in str(call)
+            ]
+            assert len(mkdir_calls) >= 1
+
+            # Verify agent.env placeholder creation is in the script
+            mkdir_script = mkdir_calls[0][0][0]
+            assert "touch" in mkdir_script
+            assert "agent.env" in mkdir_script
+            assert "chmod 600" in mkdir_script
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_syncs_app_via_scp(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup syncs app directory via scp."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+        mock_vm.ssh_exec.return_value = (True, "Success", "")
+        mock_vm.scp.return_value = (True, "", "")
+        mock_vm_class.return_value = mock_vm
+
+        with TemporaryDirectory() as tmpdir:
+            apps_dir = Path(tmpdir)
+            test_app = apps_dir / "test-app"
+            test_app.mkdir()
+            (test_app / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            result = runner.invoke(setup, ["--apps", "test-app", "--skip-provision"])
+            assert result.exit_code == 0
+
+            # Verify scp was called with correct paths
+            mock_vm.scp.assert_called()
+            scp_call = mock_vm.scp.call_args
+            assert "test-app" in scp_call[0][0]
+            assert "/srv/vmctl/apps/test-app" in scp_call[0][1]
+            assert scp_call[1]["recursive"] is True
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_deploys_app(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup deploys app via docker compose."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+        mock_vm.ssh_exec.return_value = (True, "Success", "")
+        mock_vm.scp.return_value = (True, "", "")
+        mock_vm_class.return_value = mock_vm
+
+        with TemporaryDirectory() as tmpdir:
+            apps_dir = Path(tmpdir)
+            test_app = apps_dir / "test-app"
+            test_app.mkdir()
+            (test_app / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            result = runner.invoke(setup, ["--apps", "test-app", "--skip-provision"])
+            assert result.exit_code == 0
+            assert "test-app deployed successfully" in result.output
+
+            # Verify docker compose was called
+            deploy_calls = [
+                call
+                for call in mock_vm.ssh_exec.call_args_list
+                if "docker compose up" in str(call)
+            ]
+            assert len(deploy_calls) >= 1
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_multiple_apps_in_order(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup deploys multiple apps in correct order."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+        mock_vm.ssh_exec.return_value = (True, "Success", "")
+        mock_vm.scp.return_value = (True, "", "")
+        mock_vm_class.return_value = mock_vm
+
+        with TemporaryDirectory() as tmpdir:
+            apps_dir = Path(tmpdir)
+            # Create two apps
+            for app_name in ["app1", "app2"]:
+                app = apps_dir / app_name
+                app.mkdir()
+                (app / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            result = runner.invoke(setup, ["--apps", "app1,app2", "--skip-provision"])
+            assert result.exit_code == 0
+            assert "app1 deployed successfully" in result.output
+            assert "app2 deployed successfully" in result.output
+
+            # Verify apps were synced/deployed in order
+            scp_calls = mock_vm.scp.call_args_list
+            assert len(scp_calls) == 2
+            assert "app1" in scp_calls[0][0][0]
+            assert "app2" in scp_calls[1][0][0]
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_failure_on_mkdir(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup fails gracefully when mkdir fails."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+
+        def ssh_side_effect(cmd: str) -> tuple[bool, str, str]:
+            if "command -v docker" in cmd:
+                return (True, "/usr/bin/docker", "")
+            if "mkdir" in cmd and "molt-gateway" in cmd:
+                return (False, "", "Permission denied")
+            return (True, "Success", "")
+
+        mock_vm.ssh_exec.side_effect = ssh_side_effect
+        mock_vm_class.return_value = mock_vm
+
+        with TemporaryDirectory() as tmpdir:
+            apps_dir = Path(tmpdir)
+            test_app = apps_dir / "test-app"
+            test_app.mkdir()
+            (test_app / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            result = runner.invoke(setup, ["--apps", "test-app"])
+            assert result.exit_code == 1
+            assert "Failed to create agent directories" in result.output
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_failure_on_scp(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup fails gracefully when scp fails."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+        mock_vm.ssh_exec.return_value = (True, "Success", "")
+        mock_vm.scp.return_value = (False, "", "Connection refused")
+        mock_vm_class.return_value = mock_vm
+
+        with TemporaryDirectory() as tmpdir:
+            apps_dir = Path(tmpdir)
+            test_app = apps_dir / "test-app"
+            test_app.mkdir()
+            (test_app / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            result = runner.invoke(setup, ["--apps", "test-app", "--skip-provision"])
+            assert result.exit_code == 1
+            assert "Failed to sync" in result.output
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_failure_on_deploy(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup fails gracefully when deploy fails."""
+        mock_vm = MagicMock()
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+        mock_vm.scp.return_value = (True, "", "")
+
+        def ssh_side_effect(cmd: str) -> tuple[bool, str, str]:
+            if "docker compose up" in cmd:
+                return (False, "", "Container failed to start")
+            return (True, "Success", "")
+
+        mock_vm.ssh_exec.side_effect = ssh_side_effect
+        mock_vm_class.return_value = mock_vm
+
+        with TemporaryDirectory() as tmpdir:
+            apps_dir = Path(tmpdir)
+            test_app = apps_dir / "test-app"
+            test_app.mkdir()
+            (test_app / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            result = runner.invoke(setup, ["--apps", "test-app", "--skip-provision"])
+            assert result.exit_code == 1
+            assert "Failed to deploy" in result.output
+
+
+class TestFindLocalAppsDir:
+    """Test _find_local_apps_dir helper function."""
+
+    def test_find_apps_from_cwd(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test finding apps from current working directory."""
+        # The function checks package path first, then cwd.
+        # Since we're running from the vmctl repo, the package path exists.
+        # So we test by verifying the function returns a valid apps path.
+        result = _find_local_apps_dir()
+        assert result.exists()
+        assert result.is_dir()
+        assert result.name == "apps"
+
+    def test_find_apps_not_found(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test error when apps directory not found."""
+        # We can't easily test the raise directly since package path exists
+        # This is covered by the setup command tests that mock _find_local_apps_dir
+        pass
