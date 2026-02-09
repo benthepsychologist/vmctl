@@ -15,6 +15,10 @@ console = Console()
 @click.option("--project", help="Google Cloud project ID")
 @click.option("--workstation-disk", help="Source workstation disk for migration")
 @click.option("--region", help="Google Cloud region")
+@click.option("--ssh-host", help="Direct SSH hostname or IP (bypasses gcloud SSH)")
+@click.option("--ssh-user", help="SSH username for direct SSH")
+@click.option("--ssh-key", help="Path to SSH identity file")
+@click.option("--ssh-port", type=int, help="SSH port (default: 22)")
 @click.option("--show", is_flag=True, help="Show current configuration")
 def config(
     vm_name: str | None,
@@ -22,6 +26,10 @@ def config(
     project: str | None,
     workstation_disk: str | None,
     region: str | None,
+    ssh_host: str | None,
+    ssh_user: str | None,
+    ssh_key: str | None,
+    ssh_port: int | None,
     show: bool,
 ) -> None:
     """Configure VM settings.
@@ -30,6 +38,7 @@ def config(
         vmctl config --vm-name my-dev-vm --zone us-central1-a
         vmctl config --show
         vmctl config --project my-project
+        vmctl config --ssh-host 10.0.0.5 --ssh-user root
     """
     try:
         config_mgr = ConfigManager()
@@ -50,21 +59,35 @@ def config(
             table.add_row("VM Name", current_config.vm_name)
             table.add_row("Zone", current_config.zone)
             table.add_row("Project", current_config.project or "[dim](not set)[/dim]")
-            table.add_row("Workstation Disk", current_config.workstation_disk or "[dim](not set)[/dim]")
-            table.add_row("Region", current_config.region or "[dim](not set)[/dim]")
+            not_set = "[dim](not set)[/dim]"
+            table.add_row("Workstation Disk", current_config.workstation_disk or not_set)
+            table.add_row("Region", current_config.region or not_set)
+            table.add_row("SSH Host", current_config.ssh_host or not_set)
+            table.add_row("SSH User", current_config.ssh_user or not_set)
+            table.add_row("SSH Key", current_config.ssh_key or not_set)
+            table.add_row(
+                "SSH Port",
+                str(current_config.ssh_port) if current_config.ssh_port else not_set,
+            )
 
             console.print(table)
             console.print(f"\n[dim]Config file: {config_mgr.get_config_path()}[/dim]")
             return
 
         # Update config if any options provided
-        if any([vm_name, zone, project, workstation_disk, region]):
+        all_opts = [vm_name, zone, project, workstation_disk, region,
+                    ssh_host, ssh_user, ssh_key, ssh_port]
+        if any(opt is not None for opt in all_opts):
             updated = config_mgr.update(
                 vm_name=vm_name,
                 zone=zone,
                 project=project,
                 workstation_disk=workstation_disk,
                 region=region,
+                ssh_host=ssh_host,
+                ssh_user=ssh_user,
+                ssh_key=ssh_key,
+                ssh_port=ssh_port,
             )
 
             console.print("[green]✓ Configuration updated[/green]")
@@ -84,6 +107,14 @@ def config(
                 table.add_row("Workstation Disk", updated.workstation_disk or "")
             if region:
                 table.add_row("Region", updated.region or "")
+            if ssh_host:
+                table.add_row("SSH Host", updated.ssh_host or "")
+            if ssh_user:
+                table.add_row("SSH User", updated.ssh_user or "")
+            if ssh_key:
+                table.add_row("SSH Key", updated.ssh_key or "")
+            if ssh_port:
+                table.add_row("SSH Port", str(updated.ssh_port) if updated.ssh_port else "")
 
             console.print(table)
             console.print(f"\n[dim]Saved to: {config_mgr.get_config_path()}[/dim]")

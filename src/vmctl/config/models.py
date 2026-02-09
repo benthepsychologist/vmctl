@@ -18,6 +18,18 @@ class VMConfig(BaseModel):
     app_dir: str | None = Field(
         default=None, description="Remote compose directory for Docker commands"
     )
+    ssh_host: str | None = Field(
+        default=None, description="Direct SSH hostname or IP (bypasses gcloud)"
+    )
+    ssh_user: str | None = Field(
+        default=None, description="SSH username for direct SSH"
+    )
+    ssh_key: str | None = Field(
+        default=None, description="Path to SSH identity file"
+    )
+    ssh_port: int | None = Field(
+        default=None, description="SSH port (default: 22)"
+    )
 
     @field_validator("vm_name")
     @classmethod
@@ -54,6 +66,10 @@ class VMConfig(BaseModel):
             f'WORKSTATION_DISK="{self.workstation_disk or ""}"',
             f'REGION="{self.region or ""}"',
             f'APP_DIR="{self.app_dir or ""}"',
+            f'SSH_HOST="{self.ssh_host or ""}"',
+            f'SSH_USER="{self.ssh_user or ""}"',
+            f'SSH_KEY="{self.ssh_key or ""}"',
+            f'SSH_PORT="{self.ssh_port or ""}"',
         ]
         return "\n".join(lines) + "\n"
 
@@ -67,6 +83,10 @@ class VMConfig(BaseModel):
         workstation_disk: str | None = None
         region: str | None = None
         app_dir: str | None = None
+        ssh_host: str | None = None
+        ssh_user: str | None = None
+        ssh_key: str | None = None
+        ssh_port: int | None = None
 
         for line in content.splitlines():
             line = line.strip()
@@ -93,6 +113,14 @@ class VMConfig(BaseModel):
                     region = value_or_none
                 elif key == "APP_DIR":
                     app_dir = value_or_none
+                elif key == "SSH_HOST":
+                    ssh_host = value_or_none
+                elif key == "SSH_USER":
+                    ssh_user = value_or_none
+                elif key == "SSH_KEY":
+                    ssh_key = value_or_none
+                elif key == "SSH_PORT":
+                    ssh_port = int(value) if value else None
 
         # Build config with explicit fields (use defaults if None)
         config_kwargs: dict[str, str | None] = {}
@@ -108,6 +136,14 @@ class VMConfig(BaseModel):
             config_kwargs["region"] = region
         if app_dir is not None:
             config_kwargs["app_dir"] = app_dir
+        if ssh_host is not None:
+            config_kwargs["ssh_host"] = ssh_host
+        if ssh_user is not None:
+            config_kwargs["ssh_user"] = ssh_user
+        if ssh_key is not None:
+            config_kwargs["ssh_key"] = ssh_key
+        if ssh_port is not None:
+            config_kwargs["ssh_port"] = ssh_port
 
         return cls(**config_kwargs)  # type: ignore[arg-type]
 

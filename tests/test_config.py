@@ -118,6 +118,109 @@ REGION="us-west2"
         assert parsed.zone == original.zone
         assert parsed.project == original.project
 
+    def test_ssh_fields_defaults(self) -> None:
+        """Test SSH fields default to None."""
+        config = VMConfig()
+        assert config.ssh_host is None
+        assert config.ssh_user is None
+        assert config.ssh_key is None
+        assert config.ssh_port is None
+
+    def test_ssh_fields_custom(self) -> None:
+        """Test SSH fields with custom values."""
+        config = VMConfig(
+            vm_name="test-vm",
+            zone="us-central1-a",
+            ssh_host="10.0.0.5",
+            ssh_user="root",
+            ssh_key="/home/user/.ssh/id_ed25519",
+            ssh_port=2222,
+        )
+        assert config.ssh_host == "10.0.0.5"
+        assert config.ssh_user == "root"
+        assert config.ssh_key == "/home/user/.ssh/id_ed25519"
+        assert config.ssh_port == 2222
+
+    def test_ssh_fields_to_bash_format(self) -> None:
+        """Test SSH fields in bash format output."""
+        config = VMConfig(
+            vm_name="test-vm",
+            zone="us-central1-a",
+            ssh_host="10.0.0.5",
+            ssh_user="root",
+            ssh_key="/path/to/key",
+            ssh_port=2222,
+        )
+        bash_output = config.to_bash_format()
+        assert 'SSH_HOST="10.0.0.5"' in bash_output
+        assert 'SSH_USER="root"' in bash_output
+        assert 'SSH_KEY="/path/to/key"' in bash_output
+        assert 'SSH_PORT="2222"' in bash_output
+
+    def test_ssh_fields_from_bash_format(self) -> None:
+        """Test parsing SSH fields from bash format."""
+        bash_content = '''
+VM_NAME="my-vm"
+ZONE="us-central1-a"
+PROJECT=""
+SSH_HOST="34.42.144.205"
+SSH_USER="root"
+SSH_KEY="/home/user/.ssh/id_ed25519"
+SSH_PORT="2222"
+'''
+        config = VMConfig.from_bash_format(bash_content)
+        assert config.ssh_host == "34.42.144.205"
+        assert config.ssh_user == "root"
+        assert config.ssh_key == "/home/user/.ssh/id_ed25519"
+        assert config.ssh_port == 2222
+
+    def test_ssh_fields_from_bash_format_empty(self) -> None:
+        """Test parsing SSH fields when empty (backward compat)."""
+        bash_content = '''
+VM_NAME="my-vm"
+ZONE="us-central1-a"
+SSH_HOST=""
+SSH_USER=""
+SSH_KEY=""
+SSH_PORT=""
+'''
+        config = VMConfig.from_bash_format(bash_content)
+        assert config.ssh_host is None
+        assert config.ssh_user is None
+        assert config.ssh_key is None
+        assert config.ssh_port is None
+
+    def test_ssh_fields_from_bash_format_missing(self) -> None:
+        """Test old config files without SSH fields still parse."""
+        bash_content = '''
+VM_NAME="my-vm"
+ZONE="us-central1-a"
+PROJECT="my-project"
+'''
+        config = VMConfig.from_bash_format(bash_content)
+        assert config.vm_name == "my-vm"
+        assert config.ssh_host is None
+        assert config.ssh_user is None
+
+    def test_ssh_fields_bash_roundtrip(self) -> None:
+        """Test bash format roundtrip with SSH fields."""
+        original = VMConfig(
+            vm_name="roundtrip-vm",
+            zone="us-central1-a",
+            project="test-project",
+            ssh_host="10.0.0.5",
+            ssh_user="devuser",
+            ssh_key="/path/to/key",
+            ssh_port=2222,
+        )
+        bash_str = original.to_bash_format()
+        parsed = VMConfig.from_bash_format(bash_str)
+
+        assert parsed.ssh_host == original.ssh_host
+        assert parsed.ssh_user == original.ssh_user
+        assert parsed.ssh_key == original.ssh_key
+        assert parsed.ssh_port == original.ssh_port
+
 
 class TestConfigManager:
     """Test ConfigManager."""

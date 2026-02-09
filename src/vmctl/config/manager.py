@@ -65,6 +65,10 @@ class ConfigManager:
         project: str | None = None,
         workstation_disk: str | None = None,
         region: str | None = None,
+        ssh_host: str | None = None,
+        ssh_user: str | None = None,
+        ssh_key: str | None = None,
+        ssh_port: int | None = None,
     ) -> VMConfig:
         """Update configuration fields and save.
 
@@ -74,6 +78,10 @@ class ConfigManager:
             project: Google Cloud project ID
             workstation_disk: Source workstation disk
             region: Google Cloud region
+            ssh_host: Direct SSH hostname or IP
+            ssh_user: SSH username for direct SSH
+            ssh_key: Path to SSH identity file
+            ssh_port: SSH port
 
         Returns:
             Updated VMConfig instance
@@ -92,6 +100,14 @@ class ConfigManager:
             updated_data["workstation_disk"] = workstation_disk
         if region is not None:
             updated_data["region"] = region
+        if ssh_host is not None:
+            updated_data["ssh_host"] = ssh_host
+        if ssh_user is not None:
+            updated_data["ssh_user"] = ssh_user
+        if ssh_key is not None:
+            updated_data["ssh_key"] = ssh_key
+        if ssh_port is not None:
+            updated_data["ssh_port"] = ssh_port
 
         updated_config = VMConfig(**updated_data)
         self.save(updated_config)

@@ -20,6 +20,36 @@ class VMManager:
         """
         self.config = config
 
+    @property
+    def use_direct_ssh(self) -> bool:
+        """Whether to use direct SSH instead of gcloud compute ssh."""
+        return self.config.ssh_host is not None
+
+    def _ssh_opts(self) -> list[str]:
+        """Build common SSH options for direct SSH."""
+        opts = ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
+        if self.config.ssh_key:
+            opts.extend(["-i", self.config.ssh_key])
+        if self.config.ssh_port:
+            opts.extend(["-p", str(self.config.ssh_port)])
+        return opts
+
+    def _scp_opts(self) -> list[str]:
+        """Build common SCP options for direct SSH."""
+        opts = ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
+        if self.config.ssh_key:
+            opts.extend(["-i", self.config.ssh_key])
+        if self.config.ssh_port:
+            opts.extend(["-P", str(self.config.ssh_port)])
+        return opts
+
+    def _ssh_target(self) -> str:
+        """Build user@host string for direct SSH."""
+        host = self.config.ssh_host
+        if self.config.ssh_user:
+            return f"{self.config.ssh_user}@{host}"
+        return host or ""
+
     def exists(self) -> bool:
         """Check if VM exists.
 
@@ -154,18 +184,22 @@ class VMManager:
         Raises:
             VMError: If SSH fails
         """
-        cmd = [
-            "gcloud",
-            "compute",
-            "ssh",
-            self.config.vm_name,
-            f"--zone={self.config.zone}",
-            f"--project={self.config.project}",
-            "--tunnel-through-iap",
-        ]
-
-        if command:
-            cmd.extend(["--command", command])
+        if self.use_direct_ssh:
+            cmd = ["ssh", *self._ssh_opts(), self._ssh_target()]
+            if command:
+                cmd.append(command)
+        else:
+            cmd = [
+                "gcloud",
+                "compute",
+                "ssh",
+                self.config.vm_name,
+                f"--zone={self.config.zone}",
+                f"--project={self.config.project}",
+                "--tunnel-through-iap",
+            ]
+            if command:
+                cmd.extend(["--command", command])
 
         try:
             result = run_command(cmd, check=False)
@@ -186,17 +220,20 @@ class VMManager:
         Returns:
             Tuple of (success, stdout, stderr)
         """
-        cmd = [
-            "gcloud",
-            "compute",
-            "ssh",
-            self.config.vm_name,
-            f"--zone={self.config.zone}",
-            f"--project={self.config.project}",
-            "--tunnel-through-iap",
-            "--command",
-            command,
-        ]
+        if self.use_direct_ssh:
+            cmd = ["ssh", *self._ssh_opts(), self._ssh_target(), command]
+        else:
+            cmd = [
+                "gcloud",
+                "compute",
+                "ssh",
+                self.config.vm_name,
+                f"--zone={self.config.zone}",
+                f"--project={self.config.project}",
+                "--tunnel-through-iap",
+                "--command",
+                command,
+            ]
 
         result = run_command(cmd, check=False)
         return result.success, result.stdout, result.stderr
@@ -204,7 +241,10 @@ class VMManager:
     def scp(
         self, local_path: str, remote_path: str, recursive: bool = False
     ) -> tuple[bool, str, str]:
-        """Copy files to VM via gcloud compute scp.
+        """Copy files to VM via SCP.
+
+        Uses direct scp when ssh_host is configured, otherwise
+        gcloud compute scp with IAP tunneling.
 
         Args:
             local_path: Local file or directory path
@@ -214,22 +254,28 @@ class VMManager:
         Returns:
             Tuple of (success, stdout, stderr)
         """
-        cmd = [
-            "gcloud",
-            "compute",
-            "scp",
-        ]
-        if recursive:
-            cmd.append("--recurse")
-        cmd.extend(
-            [
-                local_path,
-                f"{self.config.vm_name}:{remote_path}",
-                f"--zone={self.config.zone}",
-                f"--project={self.config.project}",
-                "--tunnel-through-iap",
+        if self.use_direct_ssh:
+            cmd = ["scp", *self._scp_opts()]
+            if recursive:
+                cmd.append("-r")
+            cmd.extend([local_path, f"{self._ssh_target()}:{remote_path}"])
+        else:
+            cmd = [
+                "gcloud",
+                "compute",
+                "scp",
             ]
-        )
+            if recursive:
+                cmd.append("--recurse")
+            cmd.extend(
+                [
+                    local_path,
+                    f"{self.config.vm_name}:{remote_path}",
+                    f"--zone={self.config.zone}",
+                    f"--project={self.config.project}",
+                    "--tunnel-through-iap",
+                ]
+            )
         result = run_command(cmd, check=False)
         return result.success, result.stdout, result.stderr
 
@@ -245,22 +291,9 @@ class VMManager:
         Raises:
             VMError: If log retrieval fails
         """
-        result = run_command(
-            [
-                "gcloud",
-                "compute",
-                "ssh",
-                self.config.vm_name,
-                f"--zone={self.config.zone}",
-                f"--project={self.config.project}",
-                "--tunnel-through-iap",
-                "--command",
-                f"sudo cat {log_file}",
-            ],
-            check=False,
-        )
+        success, stdout, stderr = self.ssh_exec(f"sudo cat {log_file}")
 
-        if not result.success:
-            raise VMError(f"Failed to retrieve logs: {result.stderr}")
+        if not success:
+            raise VMError(f"Failed to retrieve logs: {stderr}")
 
-        return result.stdout
+        return stdout

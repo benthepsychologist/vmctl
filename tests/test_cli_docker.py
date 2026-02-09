@@ -90,6 +90,7 @@ class TestProvisionCommand(TestDockerCommands):
     ) -> None:
         """Test provision when VM doesn't exist."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = False
         mock_vm.config.vm_name = "test-vm"
         mock_vm_class.return_value = mock_vm
@@ -104,6 +105,7 @@ class TestProvisionCommand(TestDockerCommands):
     ) -> None:
         """Test provision when VM is not running."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "TERMINATED"
         mock_vm.config.vm_name = "test-vm"
@@ -123,6 +125,7 @@ class TestProvisionCommand(TestDockerCommands):
     ) -> None:
         """Test successful provision."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -143,6 +146,7 @@ class TestProvisionCommand(TestDockerCommands):
     ) -> None:
         """Test provision failure."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -159,6 +163,7 @@ class TestProvisionCommand(TestDockerCommands):
     ) -> None:
         """Test provision with VMError."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.side_effect = VMError("Test error")
         mock_vm_class.return_value = mock_vm
 
@@ -186,6 +191,7 @@ class TestDeployCommand(TestDockerCommands):
     ) -> None:
         """Test deploy with no app_dir configured or passed."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -205,6 +211,7 @@ class TestDeployCommand(TestDockerCommands):
     ) -> None:
         """Test deploy using app_dir from config."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -231,6 +238,7 @@ class TestDeployCommand(TestDockerCommands):
     ) -> None:
         """Test deploy with explicit --app-dir option."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -256,6 +264,7 @@ class TestDeployCommand(TestDockerCommands):
     ) -> None:
         """Test deploy failure."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -280,6 +289,7 @@ class TestPsCommand(TestDockerCommands):
     ) -> None:
         """Test successful ps command."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -305,6 +315,7 @@ class TestPsCommand(TestDockerCommands):
     ) -> None:
         """Test ps with --all flag."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -327,6 +338,7 @@ class TestPsCommand(TestDockerCommands):
     ) -> None:
         """Test ps with no containers."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -351,6 +363,7 @@ class TestLogsCommand(TestDockerCommands):
     ) -> None:
         """Test successful logs command."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -375,6 +388,7 @@ class TestLogsCommand(TestDockerCommands):
     ) -> None:
         """Test logs for specific service."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -397,6 +411,7 @@ class TestLogsCommand(TestDockerCommands):
     ) -> None:
         """Test logs with custom tail count."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -419,6 +434,7 @@ class TestLogsCommand(TestDockerCommands):
     ) -> None:
         """Test logs when no logs found."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -443,6 +459,7 @@ class TestRestartCommand(TestDockerCommands):
     ) -> None:
         """Test restart all services."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -463,6 +480,7 @@ class TestRestartCommand(TestDockerCommands):
     ) -> None:
         """Test restart specific service."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -486,6 +504,7 @@ class TestRestartCommand(TestDockerCommands):
     ) -> None:
         """Test restart failure."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -510,6 +529,7 @@ class TestAppDirResolution(TestDockerCommands):
     ) -> None:
         """Test that explicit --app-dir overrides config value."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -533,6 +553,7 @@ class TestAppDirResolution(TestDockerCommands):
     ) -> None:
         """Test helpful error when app_dir is not set."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -622,6 +643,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test setup when VM doesn't exist."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = False
         mock_vm.config.vm_name = "test-vm"
         mock_vm_class.return_value = mock_vm
@@ -636,6 +658,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test setup when VM is not running."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "TERMINATED"
         mock_vm.config.vm_name = "test-vm"
@@ -656,6 +679,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test setup when requested app doesn't exist locally."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -681,6 +705,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test successful setup with skip-provision flag."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -714,6 +739,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test setup when Docker is already installed."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -750,6 +776,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test setup provisions Docker when not installed."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -789,6 +816,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test setup creates molt-gateway agent directories."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -832,6 +860,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test setup syncs app directory via scp."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -868,6 +897,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test setup deploys app via docker compose."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -905,6 +935,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test setup deploys multiple apps in correct order."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -943,6 +974,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test setup fails gracefully when mkdir fails."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -979,6 +1011,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test setup fails gracefully when scp fails."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"
@@ -1008,6 +1041,7 @@ class TestSetupCommand(TestDockerCommands):
     ) -> None:
         """Test setup fails gracefully when deploy fails."""
         mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
         mock_vm.status.return_value = "RUNNING"
         mock_vm.config.vm_name = "test-vm"

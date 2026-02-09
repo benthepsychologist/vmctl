@@ -63,12 +63,26 @@ def _get_vm_manager() -> tuple[VMManager, ConfigManager]:
 def _check_vm_running(vm: VMManager) -> None:
     """Check that VM exists and is running.
 
+    For direct SSH mode, performs a connectivity check instead of
+    querying GCE instance status.
+
     Args:
         vm: VM manager instance
 
     Raises:
         click.Abort: If VM doesn't exist or isn't running
     """
+    if vm.use_direct_ssh:
+        success, _, stderr = vm.ssh_exec("echo ok")
+        if not success:
+            console.print(
+                f"[red]Cannot connect to {vm.config.ssh_host} via SSH.[/red]"
+            )
+            if stderr:
+                console.print(f"[dim]{escape(stderr)}[/dim]")
+            raise click.Abort()
+        return
+
     if not vm.exists():
         console.print(f"[red]VM {vm.config.vm_name} does not exist.[/red]")
         console.print("Create it first with: vmctl init-fresh")

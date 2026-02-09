@@ -330,3 +330,202 @@ echo "world"
 
         assert success is False
         assert stderr == "Permission denied"
+
+
+@pytest.fixture
+def direct_ssh_config() -> VMConfig:
+    """Create test VM config with direct SSH enabled."""
+    return VMConfig(
+        vm_name="test-vm",
+        zone="us-central1-a",
+        project="test-project",
+        ssh_host="10.0.0.5",
+        ssh_user="devuser",
+    )
+
+
+@pytest.fixture
+def direct_ssh_manager(direct_ssh_config: VMConfig) -> VMManager:
+    """Create VM manager with direct SSH for testing."""
+    return VMManager(direct_ssh_config)
+
+
+class TestVMManagerDirectSSH:
+    """Test VMManager with direct SSH transport."""
+
+    def test_use_direct_ssh_when_host_set(
+        self, direct_ssh_manager: VMManager
+    ) -> None:
+        """Test use_direct_ssh is True when ssh_host is configured."""
+        assert direct_ssh_manager.use_direct_ssh is True
+
+    def test_use_gcloud_when_host_not_set(self, vm_manager: VMManager) -> None:
+        """Test use_direct_ssh is False when ssh_host is not set."""
+        assert vm_manager.use_direct_ssh is False
+
+    @patch("vmctl.core.vm.run_command")
+    def test_ssh_exec_direct(
+        self, mock_run: MagicMock, direct_ssh_manager: VMManager
+    ) -> None:
+        """Test ssh_exec uses plain ssh when direct SSH configured."""
+        mock_run.return_value = CommandResult(0, "output", "")
+        success, stdout, stderr = direct_ssh_manager.ssh_exec("echo hello")
+
+        assert success is True
+        assert stdout == "output"
+        expected_cmd = [
+            "ssh",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "devuser@10.0.0.5",
+            "echo hello",
+        ]
+        mock_run.assert_called_once_with(expected_cmd, check=False)
+
+    @patch("vmctl.core.vm.run_command")
+    def test_ssh_exec_direct_with_key(self, mock_run: MagicMock) -> None:
+        """Test ssh_exec includes -i flag when ssh_key is set."""
+        config = VMConfig(
+            vm_name="test-vm",
+            zone="us-central1-a",
+            project="test-project",
+            ssh_host="10.0.0.5",
+            ssh_user="root",
+            ssh_key="/path/to/key",
+        )
+        vm = VMManager(config)
+        mock_run.return_value = CommandResult(0, "", "")
+        vm.ssh_exec("hostname")
+
+        cmd = mock_run.call_args[0][0]
+        assert "-i" in cmd
+        assert "/path/to/key" in cmd
+
+    @patch("vmctl.core.vm.run_command")
+    def test_ssh_exec_direct_with_port(self, mock_run: MagicMock) -> None:
+        """Test ssh_exec includes -p flag when ssh_port is set."""
+        config = VMConfig(
+            vm_name="test-vm",
+            zone="us-central1-a",
+            project="test-project",
+            ssh_host="10.0.0.5",
+            ssh_user="root",
+            ssh_port=2222,
+        )
+        vm = VMManager(config)
+        mock_run.return_value = CommandResult(0, "", "")
+        vm.ssh_exec("hostname")
+
+        cmd = mock_run.call_args[0][0]
+        assert "-p" in cmd
+        assert "2222" in cmd
+
+    @patch("vmctl.core.vm.run_command")
+    def test_ssh_exec_direct_no_user(self, mock_run: MagicMock) -> None:
+        """Test ssh_exec with host only (no user)."""
+        config = VMConfig(
+            vm_name="test-vm",
+            zone="us-central1-a",
+            project="test-project",
+            ssh_host="10.0.0.5",
+        )
+        vm = VMManager(config)
+        mock_run.return_value = CommandResult(0, "", "")
+        vm.ssh_exec("hostname")
+
+        cmd = mock_run.call_args[0][0]
+        assert "10.0.0.5" in cmd
+        # Should not have user@ prefix
+        assert "devuser@10.0.0.5" not in cmd
+
+    @patch("vmctl.core.vm.run_command")
+    def test_scp_direct(
+        self, mock_run: MagicMock, direct_ssh_manager: VMManager
+    ) -> None:
+        """Test scp uses plain scp when direct SSH configured."""
+        mock_run.return_value = CommandResult(0, "", "")
+        success, _, _ = direct_ssh_manager.scp("/local/file", "/remote/file")
+
+        assert success is True
+        expected_cmd = [
+            "scp",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "/local/file",
+            "devuser@10.0.0.5:/remote/file",
+        ]
+        mock_run.assert_called_once_with(expected_cmd, check=False)
+
+    @patch("vmctl.core.vm.run_command")
+    def test_scp_direct_recursive(
+        self, mock_run: MagicMock, direct_ssh_manager: VMManager
+    ) -> None:
+        """Test scp with recursive flag uses -r (not --recurse)."""
+        mock_run.return_value = CommandResult(0, "", "")
+        direct_ssh_manager.scp("/local/dir", "/remote/dir", recursive=True)
+
+        cmd = mock_run.call_args[0][0]
+        assert "-r" in cmd
+        assert "--recurse" not in cmd
+
+    @patch("vmctl.core.vm.run_command")
+    def test_scp_direct_with_port(self, mock_run: MagicMock) -> None:
+        """Test scp uses uppercase -P for port."""
+        config = VMConfig(
+            vm_name="test-vm",
+            zone="us-central1-a",
+            project="test-project",
+            ssh_host="10.0.0.5",
+            ssh_user="root",
+            ssh_port=2222,
+        )
+        vm = VMManager(config)
+        mock_run.return_value = CommandResult(0, "", "")
+        vm.scp("/local/file", "/remote/file")
+
+        cmd = mock_run.call_args[0][0]
+        assert "-P" in cmd
+        assert "2222" in cmd
+        # SSH uses lowercase -p, SCP uses uppercase -P
+        p_index = cmd.index("-P")
+        assert cmd[p_index + 1] == "2222"
+
+    @patch("vmctl.core.vm.run_command")
+    def test_ssh_interactive_direct(
+        self, mock_run: MagicMock, direct_ssh_manager: VMManager
+    ) -> None:
+        """Test interactive ssh uses plain ssh."""
+        mock_run.return_value = CommandResult(0, "", "")
+        direct_ssh_manager.ssh()
+
+        cmd = mock_run.call_args[0][0]
+        assert cmd[0] == "ssh"
+        assert "devuser@10.0.0.5" in cmd
+        assert "gcloud" not in cmd
+
+    @patch("vmctl.core.vm.run_command")
+    def test_ssh_interactive_direct_with_command(
+        self, mock_run: MagicMock, direct_ssh_manager: VMManager
+    ) -> None:
+        """Test ssh with command uses plain ssh."""
+        mock_run.return_value = CommandResult(0, "", "")
+        direct_ssh_manager.ssh("ls -la")
+
+        cmd = mock_run.call_args[0][0]
+        assert cmd[0] == "ssh"
+        assert "ls -la" in cmd
+        # Direct SSH puts command as last arg, not --command
+        assert "--command" not in cmd
+
+    @patch("vmctl.core.vm.run_command")
+    def test_logs_direct(
+        self, mock_run: MagicMock, direct_ssh_manager: VMManager
+    ) -> None:
+        """Test logs method works via direct SSH."""
+        mock_run.return_value = CommandResult(0, "log content here", "")
+        result = direct_ssh_manager.logs()
+
+        assert result == "log content here"
+        cmd = mock_run.call_args[0][0]
+        assert cmd[0] == "ssh"
+        assert "sudo cat /var/log/vm-auto-shutdown.log" in cmd
