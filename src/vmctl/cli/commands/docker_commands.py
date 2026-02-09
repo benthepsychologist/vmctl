@@ -5,6 +5,7 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.markup import escape
 
 from vmctl.config.manager import ConfigManager
 from vmctl.core.exceptions import VMError
@@ -197,7 +198,7 @@ def _up_local() -> None:
     if exit_code != 0:
         console.print("[red]Failed to start code-server[/red]")
         if stderr:
-            console.print(f"[red]{stderr}[/red]")
+            console.print(f"[red]{escape(stderr)}[/red]")
         raise click.Abort()
 
     # Wait a moment for container to start
@@ -235,7 +236,7 @@ def _down_local() -> None:
     if exit_code != 0:
         console.print("[red]Failed to stop code-server[/red]")
         if stderr:
-            console.print(f"[red]{stderr}[/red]")
+            console.print(f"[red]{escape(stderr)}[/red]")
         raise click.Abort()
 
     console.print("[green]✓[/green] code-server stopped")
@@ -325,19 +326,61 @@ echo "Provisioning complete!"
         if success:
             console.print("[green]✓ Docker provisioned successfully[/green]")
             if stdout:
-                console.print(f"[dim]{stdout}[/dim]")
+                console.print(f"[dim]{escape(stdout)}[/dim]")
             console.print("\n[yellow]Note:[/yellow] Log out and back in for docker "
                          "group membership to take effect.")
             console.print("Until then, commands use sudo automatically.")
         else:
             console.print("[red]Failed to provision Docker[/red]")
             if stderr:
-                console.print(f"[red]{stderr}[/red]")
+                console.print(f"[red]{escape(stderr)}[/red]")
             raise click.Abort()
 
     except VMError as e:
         console.print(f"[red]Error: {e}[/red]")
         raise click.Abort() from None
+
+
+def _build_deploy_script(app_dir: str) -> str:
+    """Build the shell script for deploying a compose app.
+
+    This is the single source of truth for deploy logic, used by both
+    the ``deploy`` CLI command and the ``setup`` multi-app orchestrator.
+
+    Args:
+        app_dir: Remote directory containing the compose file
+
+    Returns:
+        Shell script string
+    """
+    return f"""
+set -e
+cd "{app_dir}"
+
+# Optional app-provided deploy hook (app-owned behavior)
+if [ -f ./deploy.sh ]; then
+    echo "Running pre-deploy hook: ./deploy.sh"
+    bash ./deploy.sh
+elif [ -d .git ]; then
+    echo "Updating git checkout (ff-only)..."
+    git pull --ff-only
+else
+    echo "No deploy.sh or .git found; skipping source update."
+fi
+
+# Check for any valid compose file
+if [ ! -f docker-compose.yml ] && [ ! -f docker-compose.yaml ] && \\
+   [ ! -f compose.yml ] && [ ! -f compose.yaml ]; then
+    echo "Error: No compose file found in {app_dir}"
+    exit 1
+fi
+
+echo "Running docker compose up -d --build..."
+sudo docker compose up -d --build
+
+echo "Deployment complete. Running containers:"
+sudo docker compose ps
+"""
 
 
 @click.command()
@@ -370,46 +413,16 @@ def deploy(app_dir: str | None) -> None:
             f"{vm.config.vm_name}...[/bold cyan]"
         )
 
-        # Run docker compose up with sudo for fresh VM compatibility
-        deploy_cmd = f"""
-set -e
-cd "{resolved_dir}"
-
-# Optional app-provided deploy hook (app-owned behavior)
-if [ -f ./deploy.sh ]; then
-    echo "Running pre-deploy hook: ./deploy.sh"
-    bash ./deploy.sh
-elif [ -d .git ]; then
-    echo "Updating git checkout (ff-only)..."
-    git pull --ff-only
-else
-    echo "No deploy.sh or .git found; skipping source update."
-fi
-
-# Check for any valid compose file
-if [ ! -f docker-compose.yml ] && [ ! -f docker-compose.yaml ] && \
-   [ ! -f compose.yml ] && [ ! -f compose.yaml ]; then
-    echo "Error: No compose file found in {resolved_dir}"
-    exit 1
-fi
-
-echo "Running docker compose up -d --build..."
-sudo docker compose up -d --build
-
-echo "Deployment complete. Running containers:"
-sudo docker compose ps
-"""
-
-        success, stdout, stderr = vm.ssh_exec(deploy_cmd)
+        success, stdout, stderr = vm.ssh_exec(_build_deploy_script(resolved_dir))
 
         if success:
             console.print("[green]✓ Application deployed successfully[/green]")
             if stdout:
-                console.print(f"[dim]{stdout}[/dim]")
+                console.print(f"[dim]{escape(stdout)}[/dim]")
         else:
             console.print("[red]Failed to deploy application[/red]")
             if stderr:
-                console.print(f"[red]{stderr}[/red]")
+                console.print(f"[red]{escape(stderr)}[/red]")
             raise click.Abort()
 
     except VMError as e:
@@ -467,7 +480,7 @@ sudo docker compose ps {all_flag}
         else:
             console.print("[red]Failed to get container status[/red]")
             if stderr:
-                console.print(f"[red]{stderr}[/red]")
+                console.print(f"[red]{escape(stderr)}[/red]")
             raise click.Abort()
 
     except VMError as e:
@@ -541,7 +554,7 @@ sudo docker compose logs {follow_flag} --tail {tail} {service_str}
             else:
                 console.print("[red]Failed to get logs[/red]")
                 if stderr:
-                    console.print(f"[red]{stderr}[/red]")
+                    console.print(f"[red]{escape(stderr)}[/red]")
                 raise click.Abort()
 
     except VMError as e:
@@ -595,11 +608,11 @@ sudo docker compose ps
         if success:
             console.print(f"[green]✓ Restarted{service_msg} successfully[/green]")
             if stdout:
-                console.print(f"[dim]{stdout}[/dim]")
+                console.print(f"[dim]{escape(stdout)}[/dim]")
         else:
             console.print("[red]Failed to restart services[/red]")
             if stderr:
-                console.print(f"[red]{stderr}[/red]")
+                console.print(f"[red]{escape(stderr)}[/red]")
             raise click.Abort()
 
     except VMError as e:
@@ -616,8 +629,8 @@ def _find_local_apps_dir() -> Path:
     """Find the local apps directory.
 
     Searches in order:
-    1. Package-relative location (pip install)
-    2. Current working directory (development)
+    1. Repository root relative to this source file (development / editable install)
+    2. Current working directory (fallback)
 
     Returns:
         Path to apps directory
@@ -625,20 +638,30 @@ def _find_local_apps_dir() -> Path:
     Raises:
         click.Abort: If apps directory not found
     """
-    # Try package-relative path (for pip install)
-    package_apps = Path(__file__).parent.parent.parent / "apps"
-    if package_apps.exists() and package_apps.is_dir():
-        return package_apps
+    searched: list[Path] = []
 
-    # Try current working directory (for development)
+    # Walk up from this source file to find the repo root (has pyproject.toml or .git)
+    anchor = Path(__file__).resolve().parent
+    for parent in [anchor, *anchor.parents]:
+        if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
+            repo_apps = parent / "apps"
+            searched.append(repo_apps)
+            if repo_apps.exists() and repo_apps.is_dir():
+                return repo_apps
+            break  # found repo root but no apps/ — stop climbing
+
+    # Try current working directory (for running outside the repo tree)
     cwd_apps = Path.cwd() / "apps"
+    if cwd_apps not in searched:
+        searched.append(cwd_apps)
     if cwd_apps.exists() and cwd_apps.is_dir():
         return cwd_apps
 
     console.print("[red]Error: apps directory not found.[/red]")
     console.print("Searched in:")
-    console.print(f"  - {package_apps}")
-    console.print(f"  - {cwd_apps}")
+    for p in searched:
+        console.print(f"  - {p}")
+    console.print("\nHint: pass --apps-dir to specify the apps directory explicitly.")
     raise click.Abort()
 
 
@@ -681,11 +704,11 @@ ls -la {VM_BASE_DIR}/agent/molt-gateway/
     if success:
         console.print("[green]✓ Agent directories created[/green]")
         if stdout:
-            console.print(f"[dim]{stdout}[/dim]")
+            console.print(f"[dim]{escape(stdout)}[/dim]")
     else:
         console.print("[red]Failed to create agent directories[/red]")
         if stderr:
-            console.print(f"[red]{stderr}[/red]")
+            console.print(f"[red]{escape(stderr)}[/red]")
 
     return success
 
@@ -707,18 +730,23 @@ def _sync_app(vm: VMManager, local_apps_dir: Path, app_name: str) -> bool:
         return False
 
     remote_app_path = f"{VM_BASE_DIR}/apps/{app_name}"
+    remote_apps_parent = f"{VM_BASE_DIR}/apps"
 
     console.print(f"[bold cyan]Syncing {app_name}...[/bold cyan]")
 
-    # First ensure the remote directory exists
-    success, _, stderr = vm.ssh_exec(f"mkdir -p {remote_app_path}")
+    # Ensure the parent apps directory exists
+    success, _, stderr = vm.ssh_exec(f"mkdir -p {remote_apps_parent}")
     if not success:
-        console.print(f"[red]Failed to create remote directory: {stderr}[/red]")
+        console.print(f"[red]Failed to create remote directory: {escape(stderr)}[/red]")
         return False
 
-    # Copy the app directory contents
+    # Remove old app dir to avoid scp double-nesting (scp -r copies dir INTO
+    # an existing target, creating target/dir/... instead of replacing contents)
+    vm.ssh_exec(f"rm -rf {remote_app_path}")
+
+    # Copy the app directory into the parent; scp creates app_name/ from the basename
     success, stdout, stderr = vm.scp(
-        f"{local_app_path}/", remote_app_path, recursive=True
+        str(local_app_path), remote_apps_parent, recursive=True
     )
 
     if success:
@@ -726,13 +754,13 @@ def _sync_app(vm: VMManager, local_apps_dir: Path, app_name: str) -> bool:
     else:
         console.print(f"[red]Failed to sync {app_name}[/red]")
         if stderr:
-            console.print(f"[red]{stderr}[/red]")
+            console.print(f"[red]{escape(stderr)}[/red]")
 
     return success
 
 
 def _deploy_app(vm: VMManager, app_name: str) -> bool:
-    """Deploy a single app on the VM.
+    """Deploy a single app on the VM using the shared deploy logic.
 
     Args:
         vm: VM manager instance
@@ -745,40 +773,16 @@ def _deploy_app(vm: VMManager, app_name: str) -> bool:
 
     console.print(f"[bold cyan]Deploying {app_name}...[/bold cyan]")
 
-    deploy_script = f"""
-set -e
-cd "{remote_app_path}"
-
-# Run deploy.sh if it exists (app-owned validation)
-if [ -f ./deploy.sh ]; then
-    echo "Running deploy.sh..."
-    bash ./deploy.sh
-fi
-
-# Check for compose file
-if [ ! -f docker-compose.yml ] && [ ! -f docker-compose.yaml ] && \
-   [ ! -f compose.yml ] && [ ! -f compose.yaml ]; then
-    echo "Error: No compose file found in {remote_app_path}"
-    exit 1
-fi
-
-echo "Running docker compose up -d --build..."
-sudo docker compose up -d --build
-
-echo "Deployment complete. Running containers:"
-sudo docker compose ps
-"""
-
-    success, stdout, stderr = vm.ssh_exec(deploy_script)
+    success, stdout, stderr = vm.ssh_exec(_build_deploy_script(remote_app_path))
 
     if success:
         console.print(f"[green]✓ {app_name} deployed successfully[/green]")
         if stdout:
-            console.print(f"[dim]{stdout}[/dim]")
+            console.print(f"[dim]{escape(stdout)}[/dim]")
     else:
         console.print(f"[red]Failed to deploy {app_name}[/red]")
         if stderr:
-            console.print(f"[red]{stderr}[/red]")
+            console.print(f"[red]{escape(stderr)}[/red]")
 
     return success
 
@@ -789,11 +793,16 @@ sudo docker compose ps
     help="Comma-separated list of apps to deploy (default: molt-gateway,workstation)",
 )
 @click.option(
+    "--apps-dir",
+    type=click.Path(exists=True, file_okay=False, resolve_path=True),
+    help="Path to local apps directory (auto-detected if omitted)",
+)
+@click.option(
     "--skip-provision",
     is_flag=True,
     help="Skip Docker provisioning (assumes Docker is already installed)",
 )
-def setup(apps: str | None, skip_provision: bool) -> None:
+def setup(apps: str | None, apps_dir: str | None, skip_provision: bool) -> None:
     """Set up the VM with multiple apps in one operation.
 
     This command orchestrates the full deployment of multiple apps:
@@ -809,14 +818,15 @@ def setup(apps: str | None, skip_provision: bool) -> None:
         vmctl setup                           # Deploy default apps
         vmctl setup --apps molt-gateway       # Deploy specific app
         vmctl setup --skip-provision          # Skip Docker install
+        vmctl setup --apps-dir /path/to/apps  # Explicit apps directory
     """
     try:
-        vm, config_mgr = _get_vm_manager()
+        vm, _ = _get_vm_manager()
         _check_vm_running(vm)
 
-        # Parse apps list
+        # Parse apps list, dropping empty entries from trailing commas
         if apps:
-            app_list = [a.strip() for a in apps.split(",")]
+            app_list = [a.strip() for a in apps.split(",") if a.strip()]
         else:
             app_list = DEFAULT_APPS
 
@@ -826,7 +836,7 @@ def setup(apps: str | None, skip_provision: bool) -> None:
         )
 
         # Find local apps directory
-        local_apps_dir = _find_local_apps_dir()
+        local_apps_dir = Path(apps_dir) if apps_dir else _find_local_apps_dir()
         console.print(f"[dim]Using local apps from: {local_apps_dir}[/dim]")
 
         # Validate all apps exist locally before starting
@@ -879,7 +889,7 @@ echo "Provisioning complete!"
                 if not success:
                     console.print("[red]Failed to provision Docker[/red]")
                     if stderr:
-                        console.print(f"[red]{stderr}[/red]")
+                        console.print(f"[red]{escape(stderr)}[/red]")
                     raise click.Abort()
                 console.print("[green]✓ Docker provisioned[/green]")
         else:

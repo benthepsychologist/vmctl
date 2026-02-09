@@ -850,10 +850,11 @@ class TestSetupCommand(TestDockerCommands):
             assert result.exit_code == 0
 
             # Verify scp was called with correct paths
+            # scp copies the app dir into the parent to avoid double-nesting
             mock_vm.scp.assert_called()
             scp_call = mock_vm.scp.call_args
             assert "test-app" in scp_call[0][0]
-            assert "/srv/vmctl/apps/test-app" in scp_call[0][1]
+            assert scp_call[0][1] == "/srv/vmctl/apps"
             assert scp_call[1]["recursive"] is True
 
     @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
