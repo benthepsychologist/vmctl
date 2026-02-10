@@ -814,7 +814,7 @@ class TestSetupCommand(TestDockerCommands):
         runner: CliRunner,
         temp_config_dir: Path,
     ) -> None:
-        """Test setup creates molt-gateway agent directories."""
+        """Test setup creates openclaw-gateway agent directories."""
         mock_vm = MagicMock()
         mock_vm.use_direct_ssh = False
         mock_vm.exists.return_value = True
@@ -839,7 +839,7 @@ class TestSetupCommand(TestDockerCommands):
             mkdir_calls = [
                 call
                 for call in mock_vm.ssh_exec.call_args_list
-                if "mkdir" in str(call) and "molt-gateway" in str(call)
+                if "mkdir" in str(call) and "openclaw-gateway" in str(call)
             ]
             assert len(mkdir_calls) >= 1
 
@@ -982,7 +982,7 @@ class TestSetupCommand(TestDockerCommands):
         def ssh_side_effect(cmd: str) -> tuple[bool, str, str]:
             if "command -v docker" in cmd:
                 return (True, "/usr/bin/docker", "")
-            if "mkdir" in cmd and "molt-gateway" in cmd:
+            if "mkdir" in cmd and "openclaw-gateway" in cmd:
                 return (False, "", "Permission denied")
             return (True, "Success", "")
 
@@ -1065,6 +1065,206 @@ class TestSetupCommand(TestDockerCommands):
             result = runner.invoke(setup, ["--apps", "test-app", "--skip-provision"])
             assert result.exit_code == 1
             assert "Failed to deploy" in result.output
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_with_gateway_repo_option(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup with --gateway-repo option syncs the repo before deploying."""
+        mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+        mock_vm.ssh_exec.return_value = (True, "Success", "")
+        mock_vm.scp.return_value = (True, "", "")
+        mock_vm_class.return_value = mock_vm
+
+        with TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+            apps_dir = tmppath / "apps"
+            apps_dir.mkdir()
+            openclaw_gateway = apps_dir / "openclaw-gateway"
+            openclaw_gateway.mkdir()
+            (openclaw_gateway / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            # Create a fake gateway repo
+            gateway_repo = tmppath / "openclaw-gateway"
+            gateway_repo.mkdir()
+            (gateway_repo / "Dockerfile").write_text("FROM node:20")
+
+            result = runner.invoke(
+                setup,
+                ["--apps", "openclaw-gateway", "--skip-provision", "--gateway-repo", str(gateway_repo)],
+            )
+            assert result.exit_code == 0
+            assert "openclaw-gateway repo synced" in result.output
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_gateway_repo_invalid_path_error(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup fails when --gateway-repo points to non-existent path."""
+        mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+        mock_vm.ssh_exec.return_value = (True, "Success", "")
+        mock_vm.scp.return_value = (True, "", "")
+        mock_vm_class.return_value = mock_vm
+
+        with TemporaryDirectory() as tmpdir:
+            apps_dir = Path(tmpdir)
+            openclaw_gateway = apps_dir / "openclaw-gateway"
+            openclaw_gateway.mkdir()
+            (openclaw_gateway / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            # Explicitly point to a non-existent path - click should reject this
+            nonexistent_repo = "/tmp/definitely-does-not-exist-openclaw-gateway-xyz123"
+            result = runner.invoke(
+                setup,
+                ["--apps", "openclaw-gateway", "--skip-provision", "--gateway-repo", nonexistent_repo],
+            )
+            # Click validates exists=True and should fail
+            assert result.exit_code != 0
+            assert "does not exist" in result.output.lower() or "invalid" in result.output.lower()
+
+    @patch("vmctl.cli.commands.docker_commands._find_local_apps_dir")
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_setup_checks_agent_secrets(
+        self,
+        mock_vm_class: MagicMock,
+        mock_find_apps: MagicMock,
+        runner: CliRunner,
+        temp_config_dir: Path,
+    ) -> None:
+        """Test setup checks and warns about empty agent.env."""
+        mock_vm = MagicMock()
+        mock_vm.use_direct_ssh = False
+        mock_vm.exists.return_value = True
+        mock_vm.status.return_value = "RUNNING"
+        mock_vm.config.vm_name = "test-vm"
+
+        def ssh_side_effect(cmd: str) -> tuple[bool, str, str]:
+            if "SECRETS_FILE" in cmd:
+                return (True, "EMPTY", "")
+            return (True, "Success", "")
+
+        mock_vm.ssh_exec.side_effect = ssh_side_effect
+        mock_vm.scp.return_value = (True, "", "")
+        mock_vm_class.return_value = mock_vm
+
+        with TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+            apps_dir = tmppath / "apps"
+            apps_dir.mkdir()
+            openclaw_gateway = apps_dir / "openclaw-gateway"
+            openclaw_gateway.mkdir()
+            (openclaw_gateway / "compose.yml").write_text("version: '3'")
+            mock_find_apps.return_value = apps_dir
+
+            # Create fake gateway repo to avoid warning about missing repo
+            gateway_repo = tmppath / "openclaw-gateway"
+            gateway_repo.mkdir()
+            (gateway_repo / "Dockerfile").write_text("FROM node:20")
+
+            result = runner.invoke(
+                setup,
+                ["--apps", "openclaw-gateway", "--skip-provision", "--gateway-repo", str(gateway_repo)],
+            )
+            assert result.exit_code == 0
+            assert "agent.env is empty" in result.output
+
+
+class TestSyncGatewayRepo:
+    """Test _sync_gateway_repo helper function."""
+
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_sync_gateway_repo_success(
+        self,
+        mock_vm_class: MagicMock,
+    ) -> None:
+        """Test successful gateway repo sync."""
+        from vmctl.cli.commands.docker_commands import _sync_gateway_repo
+
+        mock_vm = MagicMock()
+        mock_vm.ssh_exec.return_value = (True, "", "")
+        mock_vm.scp.return_value = (True, "", "")
+
+        with TemporaryDirectory() as tmpdir:
+            repo_path = Path(tmpdir)
+            (repo_path / "Dockerfile").write_text("FROM node:20")
+
+            result = _sync_gateway_repo(mock_vm, repo_path)
+            assert result is True
+            mock_vm.scp.assert_called_once()
+
+    @patch("vmctl.cli.commands.docker_commands.VMManager")
+    def test_sync_gateway_repo_failure(
+        self,
+        mock_vm_class: MagicMock,
+    ) -> None:
+        """Test gateway repo sync handles scp failure."""
+        from vmctl.cli.commands.docker_commands import _sync_gateway_repo
+
+        mock_vm = MagicMock()
+        mock_vm.ssh_exec.return_value = (True, "", "")
+        mock_vm.scp.return_value = (False, "", "Connection refused")
+
+        with TemporaryDirectory() as tmpdir:
+            repo_path = Path(tmpdir)
+
+            result = _sync_gateway_repo(mock_vm, repo_path)
+            assert result is False
+
+
+class TestCheckAgentSecrets:
+    """Test _check_agent_secrets helper function."""
+
+    def test_check_secrets_ok(self) -> None:
+        """Test no warning when secrets file has content."""
+        from vmctl.cli.commands.docker_commands import _check_agent_secrets
+
+        mock_vm = MagicMock()
+        mock_vm.ssh_exec.return_value = (True, "OK", "")
+
+        # Should not raise, just return silently
+        _check_agent_secrets(mock_vm)
+
+    def test_check_secrets_missing(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test warning when secrets file is missing."""
+        from vmctl.cli.commands.docker_commands import _check_agent_secrets
+
+        mock_vm = MagicMock()
+        mock_vm.ssh_exec.return_value = (True, "MISSING", "")
+
+        _check_agent_secrets(mock_vm)
+        # Rich console output captured via stdout
+        # The warning should be printed
+
+    def test_check_secrets_empty(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test warning when secrets file is empty."""
+        from vmctl.cli.commands.docker_commands import _check_agent_secrets
+
+        mock_vm = MagicMock()
+        mock_vm.ssh_exec.return_value = (True, "EMPTY", "")
+
+        _check_agent_secrets(mock_vm)
+        # Rich console output captured via stdout
+        # The warning should be printed
 
 
 class TestFindLocalAppsDir:

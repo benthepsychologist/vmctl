@@ -1,4 +1,4 @@
-# molt-gateway Agent Zone App
+# openclaw-gateway Agent Zone App
 #
 # Trust boundary: This container operates in the AGENT zone with strict isolation.
 # - Agent CANNOT access /workspace or broader host filesystem
@@ -8,29 +8,30 @@
 # Life/dev zones CAN access this app's directories for review/ops/recovery.
 
 services:
-  molt:
-    image: molt-gateway:agent
+  openclaw:
+    image: openclaw-gateway:agent
     build:
-      context: /srv/vmctl/agent/molt-gateway/repo
-    container_name: molt-gateway
-    hostname: molt
+      context: /srv/vmctl/agent/openclaw-gateway/repo
+    container_name: openclaw-gateway
+    hostname: openclaw
 
     # Strict mount allowlist - agent sees ONLY these paths
     volumes:
       # Code checkout (read-only)
-      - /srv/vmctl/agent/molt-gateway/repo:/app:ro
+      - /srv/vmctl/agent/openclaw-gateway/repo:/app:ro
       # Artifact outbox (read-write) - cross-zone channel
-      - /srv/vmctl/agent/molt-gateway/outbox:/outbox:rw
+      - /srv/vmctl/agent/openclaw-gateway/outbox:/outbox:rw
       # Runtime state (read-write) - sqlite, caches, queues
-      - /srv/vmctl/agent/molt-gateway/state:/state:rw
+      - /srv/vmctl/agent/openclaw-gateway/state:/state:rw
 
     # Load only explicitly granted tokens
     env_file:
-      - /srv/vmctl/agent/molt-gateway/secrets/agent.env
+      - /srv/vmctl/agent/openclaw-gateway/secrets/agent.env
 
     environment:
       - ZONE=agent
       - TRUST_LEVEL=restricted
+      - OPENCLAW_STATE_DIR=/state
 
     # Security hardening
     read_only: true

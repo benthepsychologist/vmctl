@@ -14,7 +14,7 @@ from vmctl.core.vm import VMManager
 console = Console()
 
 # Default apps to deploy in order (dependencies first)
-DEFAULT_APPS = ["molt-gateway", "workstation"]
+DEFAULT_APPS = ["openclaw-gateway", "workstation"]
 
 # Base directory for vmctl on the VM
 VM_BASE_DIR = "/srv/vmctl"
@@ -680,10 +680,10 @@ def _find_local_apps_dir() -> Path:
 
 
 def _setup_molt_directories(vm: VMManager) -> bool:
-    """Pre-create required molt-gateway agent directories on VM.
+    """Pre-create required openclaw-gateway agent directories on VM.
 
-    Creates the directory structure that molt-gateway expects:
-    /srv/vmctl/agent/molt-gateway/{repo,outbox,state,secrets}
+    Creates the directory structure that openclaw-gateway expects:
+    /srv/vmctl/agent/openclaw-gateway/{repo,outbox,state,secrets}
 
     Args:
         vm: VM manager instance
@@ -694,23 +694,29 @@ def _setup_molt_directories(vm: VMManager) -> bool:
 
     mkdir_script = f"""
 set -e
-sudo mkdir -p {VM_BASE_DIR}/agent/molt-gateway/repo
-sudo mkdir -p {VM_BASE_DIR}/agent/molt-gateway/outbox
-sudo mkdir -p {VM_BASE_DIR}/agent/molt-gateway/state
-sudo mkdir -p {VM_BASE_DIR}/agent/molt-gateway/secrets
+sudo mkdir -p {VM_BASE_DIR}/agent/openclaw-gateway/repo
+sudo mkdir -p {VM_BASE_DIR}/agent/openclaw-gateway/outbox
+sudo mkdir -p {VM_BASE_DIR}/agent/openclaw-gateway/state
+sudo mkdir -p {VM_BASE_DIR}/agent/openclaw-gateway/secrets
 sudo mkdir -p {VM_BASE_DIR}/apps
 
-# Create placeholder agent.env if it doesn't exist (required by molt-gateway deploy.sh)
-if [ ! -f {VM_BASE_DIR}/agent/molt-gateway/secrets/agent.env ]; then
-    sudo touch {VM_BASE_DIR}/agent/molt-gateway/secrets/agent.env
-    sudo chmod 600 {VM_BASE_DIR}/agent/molt-gateway/secrets/agent.env
+# Create placeholder agent.env if it doesn't exist (required by openclaw-gateway deploy.sh)
+if [ ! -f {VM_BASE_DIR}/agent/openclaw-gateway/secrets/agent.env ]; then
+    sudo touch {VM_BASE_DIR}/agent/openclaw-gateway/secrets/agent.env
+    sudo chmod 600 {VM_BASE_DIR}/agent/openclaw-gateway/secrets/agent.env
 fi
 
 # Set ownership to current user for app deployment
 sudo chown -R $USER:$USER {VM_BASE_DIR}
 
+# Make state and outbox world-writable for container access
+# (Container runs as root, host directories owned by $USER)
+# Use -R to fix any subdirectories created by previous container runs
+sudo chmod -R 777 {VM_BASE_DIR}/agent/openclaw-gateway/outbox
+sudo chmod -R 777 {VM_BASE_DIR}/agent/openclaw-gateway/state
+
 echo "Agent directories created:"
-ls -la {VM_BASE_DIR}/agent/molt-gateway/
+ls -la {VM_BASE_DIR}/agent/openclaw-gateway/
 """
 
     success, stdout, stderr = vm.ssh_exec(mkdir_script)
@@ -801,10 +807,169 @@ def _deploy_app(vm: VMManager, app_name: str) -> bool:
     return success
 
 
+def _sync_gateway_repo(vm: VMManager, local_repo_path: Path) -> bool:
+    """Sync openclaw-gateway repo to VM for container build context.
+
+    The gateway container builds from source code in
+    /srv/vmctl/agent/openclaw-gateway/repo. This function syncs the local
+    openclaw-gateway repository to that location.
+
+    Args:
+        vm: VM manager instance
+        local_repo_path: Path to local openclaw-gateway repo
+
+    Returns:
+        True if successful, False otherwise
+    """
+    remote_repo_path = f"{VM_BASE_DIR}/agent/openclaw-gateway/repo"
+
+    console.print("[bold cyan]Syncing openclaw-gateway repo...[/bold cyan]")
+
+    # Remove old repo contents to avoid scp nesting issues
+    vm.ssh_exec(f"rm -rf {remote_repo_path}/*")
+
+    # Copy repo contents to the remote repo directory
+    # Important: scp copies directory INTO target, so we need to copy to parent
+    # and let the directory name become part of the target path
+    # e.g., scp /workspace/openclaw-gateway /srv/vmctl/agent/openclaw-gateway/
+    # creates /srv/vmctl/agent/openclaw-gateway/openclaw-gateway/
+    # But we want files directly in repo/, so we rename after copy
+    repo_name = local_repo_path.name  # e.g., "openclaw-gateway"
+    parent_path = f"{VM_BASE_DIR}/agent/openclaw-gateway"
+    success, stdout, stderr = vm.scp(str(local_repo_path), parent_path, recursive=True)
+
+    if success:
+        # Move contents from nested dir to repo/ and remove the nested dir
+        vm.ssh_exec(f"rm -rf {remote_repo_path}/* && mv {parent_path}/{repo_name}/* {remote_repo_path}/ && rm -rf {parent_path}/{repo_name}")
+
+    if success:
+        console.print("[green]✓ openclaw-gateway repo synced[/green]")
+    else:
+        console.print("[red]Failed to sync openclaw-gateway repo[/red]")
+        if stderr:
+            console.print(f"[red]{escape(stderr)}[/red]")
+
+    return success
+
+
+def _check_agent_secrets(vm: VMManager) -> None:
+    """Warn if agent.env is empty or missing.
+
+    This is a non-blocking check that prints a warning if the secrets
+    file is missing or empty. The container will still start but services
+    may fail to authenticate.
+
+    Args:
+        vm: VM manager instance
+    """
+    check_script = f"""
+    SECRETS_FILE="{VM_BASE_DIR}/agent/openclaw-gateway/secrets/agent.env"
+    if [ ! -f "$SECRETS_FILE" ]; then
+        echo "MISSING"
+    elif [ ! -s "$SECRETS_FILE" ]; then
+        echo "EMPTY"
+    else
+        echo "OK"
+    fi
+    """
+    success, stdout, _ = vm.ssh_exec(check_script)
+    if success:
+        status = stdout.strip()
+        if status == "MISSING":
+            console.print(
+                "[yellow]⚠ agent.env not found - "
+                "openclaw-gateway services may fail to authenticate[/yellow]"
+            )
+        elif status == "EMPTY":
+            console.print(
+                "[yellow]⚠ agent.env is empty - "
+                "populate with Discord/Telegram tokens and API keys[/yellow]"
+            )
+
+
+def _grant_bigquery_permissions(project: str, vm_name: str, zone: str) -> bool:
+    """Grant BigQuery permissions to the VM's compute service account.
+
+    Attempts to grant roles/bigquery.dataEditor and roles/bigquery.jobUser
+    to the default compute service account. This requires the caller
+    (gcloud authenticated user) to have IAM admin permissions.
+
+    Args:
+        project: GCP project ID
+        vm_name: VM instance name
+        zone: VM zone
+
+    Returns:
+        True if permissions were granted successfully, False otherwise
+    """
+    import subprocess
+
+    console.print("[bold cyan]Checking BigQuery permissions...[/bold cyan]")
+
+    # Get the VM's service account
+    try:
+        result = subprocess.run(
+            [
+                "gcloud", "compute", "instances", "describe", vm_name,
+                f"--zone={zone}", f"--project={project}",
+                "--format=value(serviceAccounts[0].email)"
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        sa_email = result.stdout.strip()
+        if not sa_email:
+            console.print("[yellow]⚠ Could not determine VM service account[/yellow]")
+            return False
+
+        console.print(f"[dim]VM service account: {sa_email}[/dim]")
+    except subprocess.CalledProcessError as e:
+        console.print(f"[yellow]⚠ Could not get VM info: {e.stderr}[/yellow]")
+        return False
+
+    # Try to grant BigQuery permissions
+    roles = ["roles/bigquery.dataEditor", "roles/bigquery.jobUser"]
+    all_granted = True
+
+    for role in roles:
+        try:
+            result = subprocess.run(
+                [
+                    "gcloud", "projects", "add-iam-policy-binding", project,
+                    f"--member=serviceAccount:{sa_email}",
+                    f"--role={role}",
+                    "--quiet",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            console.print(f"[green]✓ Granted {role}[/green]")
+        except subprocess.CalledProcessError as e:
+            all_granted = False
+            if "does not have permission" in e.stderr or "403" in e.stderr:
+                console.print(f"[yellow]⚠ Cannot grant {role} - need IAM admin access[/yellow]")
+            else:
+                console.print(f"[yellow]⚠ Failed to grant {role}: {e.stderr.strip()}[/yellow]")
+
+    if not all_granted:
+        console.print("\n[yellow]BigQuery permissions could not be granted automatically.[/yellow]")
+        console.print("Run these commands as a project owner:\n")
+        console.print(f"  gcloud projects add-iam-policy-binding {project} \\")
+        console.print(f"    --member='serviceAccount:{sa_email}' \\")
+        console.print(f"    --role='roles/bigquery.dataEditor'\n")
+        console.print(f"  gcloud projects add-iam-policy-binding {project} \\")
+        console.print(f"    --member='serviceAccount:{sa_email}' \\")
+        console.print(f"    --role='roles/bigquery.jobUser'\n")
+
+    return all_granted
+
+
 @click.command()
 @click.option(
     "--apps",
-    help="Comma-separated list of apps to deploy (default: molt-gateway,workstation)",
+    help="Comma-separated list of apps to deploy (default: openclaw-gateway,workstation)",
 )
 @click.option(
     "--apps-dir",
@@ -816,7 +981,17 @@ def _deploy_app(vm: VMManager, app_name: str) -> bool:
     is_flag=True,
     help="Skip Docker provisioning (assumes Docker is already installed)",
 )
-def setup(apps: str | None, apps_dir: str | None, skip_provision: bool) -> None:
+@click.option(
+    "--gateway-repo",
+    type=click.Path(exists=True, file_okay=False, resolve_path=True),
+    help="Path to local openclaw-gateway repo to sync (default: /workspace/openclaw-gateway)",
+)
+def setup(
+    apps: str | None,
+    apps_dir: str | None,
+    skip_provision: bool,
+    gateway_repo: str | None,
+) -> None:
     """Set up the VM with multiple apps in one operation.
 
     This command orchestrates the full deployment of multiple apps:
@@ -826,11 +1001,11 @@ def setup(apps: str | None, apps_dir: str | None, skip_provision: bool) -> None:
     4. Deploys apps in dependency order
 
     Apps are deployed to /srv/vmctl/apps/{app-name}/ on the VM.
-    Agent directories are created at /srv/vmctl/agent/molt-gateway/.
+    Agent directories are created at /srv/vmctl/agent/openclaw-gateway/.
 
     Examples:
         vmctl setup                           # Deploy default apps
-        vmctl setup --apps molt-gateway       # Deploy specific app
+        vmctl setup --apps openclaw-gateway   # Deploy specific app
         vmctl setup --skip-provision          # Skip Docker install
         vmctl setup --apps-dir /path/to/apps  # Explicit apps directory
     """
@@ -914,39 +1089,245 @@ echo "Provisioning complete!"
         if not _setup_molt_directories(vm):
             raise click.Abort()
 
-        # Step 3 & 4: Sync and deploy each app in order
+        # Step 3: Sync openclaw-gateway repo if deploying openclaw-gateway
+        step_offset = 2
+        if "openclaw-gateway" in app_list:
+            step_offset = 3
+            console.print("\n[bold]Step 3: Syncing openclaw-gateway repo...[/bold]")
+            repo_path = Path(gateway_repo) if gateway_repo else Path("/workspace/openclaw-gateway")
+            if repo_path.exists():
+                if not _sync_gateway_repo(vm, repo_path):
+                    raise click.Abort()
+            else:
+                console.print(
+                    f"[yellow]⚠ openclaw-gateway repo not found at {repo_path}[/yellow]"
+                )
+                console.print(
+                    "[yellow]Container build may fail - no Dockerfile in build context[/yellow]"
+                )
+
+        # Step 4+: Sync and deploy each app in order
         for i, app_name in enumerate(app_list, start=1):
-            console.print(f"\n[bold]Step {2 + i}a: Syncing {app_name}...[/bold]")
+            console.print(f"\n[bold]Step {step_offset + i}a: Syncing {app_name}...[/bold]")
             if not _sync_app(vm, local_apps_dir, app_name):
                 raise click.Abort()
 
-            console.print(f"\n[bold]Step {2 + i}b: Deploying {app_name}...[/bold]")
+            console.print(f"\n[bold]Step {step_offset + i}b: Deploying {app_name}...[/bold]")
             if not _deploy_app(vm, app_name):
                 raise click.Abort()
+
+            # Check secrets and permissions after deploying openclaw-gateway
+            if app_name == "openclaw-gateway":
+                _check_agent_secrets(vm)
+                # Try to grant BigQuery permissions (non-blocking)
+                if vm.config.project:
+                    _grant_bigquery_permissions(
+                        vm.config.project, vm.config.vm_name, vm.config.zone
+                    )
 
         # Final status
         console.print("\n" + "=" * 60)
         console.print("[bold green]✓ Setup complete![/bold green]")
         console.print(f"Apps deployed to: {VM_BASE_DIR}/apps/")
-        console.print(f"Agent directories: {VM_BASE_DIR}/agent/molt-gateway/")
+        console.print(f"Agent directories: {VM_BASE_DIR}/agent/openclaw-gateway/")
 
-        # Warn about agent.env configuration if molt-gateway was deployed
-        if "molt-gateway" in app_list:
+        # Warn about agent.env configuration if openclaw-gateway was deployed
+        if "openclaw-gateway" in app_list:
             console.print(
-                "\n[yellow]Note:[/yellow] Configure agent.env before using molt-gateway:"
+                "\n[yellow]Note:[/yellow] Configure secrets before using openclaw-gateway:"
             )
             console.print(
-                f"  vmctl ssh -- 'sudo nano {VM_BASE_DIR}/agent/molt-gateway/secrets/agent.env'"
+                "  vmctl secrets -s AZURE_OPENAI_API_KEY=... -s AZURE_OPENAI_HOST=..."
             )
-            console.print(
-                f"  See: {VM_BASE_DIR}/apps/molt-gateway/agent.env.example"
-            )
+            console.print("  vmctl secrets --list        # View current secrets")
+            console.print("  vmctl secrets --edit        # Edit interactively")
 
         console.print("\nUseful commands:")
         for app_name in app_list:
             remote_path = f"{VM_BASE_DIR}/apps/{app_name}"
             console.print(f"  vmctl ps --app-dir {remote_path}")
         console.print("=" * 60)
+
+    except VMError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise click.Abort() from None
+
+
+# ============================================================================
+# Secrets Management Command
+# ============================================================================
+
+
+@click.command()
+@click.option(
+    "--set",
+    "-s",
+    "secrets_to_set",
+    multiple=True,
+    metavar="KEY=VALUE",
+    help="Set a secret (can be used multiple times). Example: -s AZURE_OPENAI_API_KEY=abc123",
+)
+@click.option(
+    "--list",
+    "-l",
+    "list_secrets",
+    is_flag=True,
+    help="List currently set secret keys (values hidden)",
+)
+@click.option(
+    "--edit",
+    "-e",
+    "edit_secrets",
+    is_flag=True,
+    help="Open agent.env in an editor on the VM",
+)
+def secrets(
+    secrets_to_set: tuple[str, ...],
+    list_secrets: bool,
+    edit_secrets: bool,
+) -> None:
+    """Manage openclaw-gateway secrets (agent.env).
+
+    Examples:
+
+        # Set Azure OpenAI credentials
+        vmctl secrets -s AZURE_OPENAI_API_KEY=your-key -s AZURE_OPENAI_HOST=your-resource.openai.azure.com
+
+        # List current secrets (keys only)
+        vmctl secrets --list
+
+        # Edit secrets interactively on VM
+        vmctl secrets --edit
+    """
+    try:
+        vm, _ = _get_vm_manager()
+        _check_vm_running(vm)
+
+        secrets_file = f"{VM_BASE_DIR}/agent/openclaw-gateway/secrets/agent.env"
+
+        if list_secrets:
+            # List secret keys (not values)
+            console.print(f"[bold cyan]Secrets in {secrets_file}:[/bold cyan]")
+            list_cmd = f"""
+if [ -f "{secrets_file}" ]; then
+    grep -E '^[A-Z_]+=' "{secrets_file}" 2>/dev/null | cut -d= -f1 | sort
+else
+    echo "(file not found)"
+fi
+"""
+            success, stdout, stderr = vm.ssh_exec(list_cmd)
+            if success and stdout.strip():
+                for key in stdout.strip().split("\n"):
+                    if key and key != "(file not found)":
+                        console.print(f"  {key}=***")
+                    elif key == "(file not found)":
+                        console.print("[yellow]  (no secrets file found)[/yellow]")
+            else:
+                console.print("[yellow]  (no secrets set)[/yellow]")
+            return
+
+        if edit_secrets:
+            # Open editor on VM - this requires interactive SSH
+            console.print(f"[bold cyan]Opening {secrets_file} for editing...[/bold cyan]")
+            console.print("[dim]Use Ctrl+X to save and exit nano[/dim]")
+
+            # Use interactive SSH for editing
+            import subprocess as sp
+
+            if vm.use_direct_ssh:
+                ssh_cmd = [
+                    "ssh",
+                    "-t",  # Force TTY allocation
+                    "-o", "StrictHostKeyChecking=no",
+                    "-o", "UserKnownHostsFile=/dev/null",
+                    "-i", vm.config.ssh_key,
+                    f"{vm.config.ssh_user}@{vm.config.ssh_host}",
+                    f"sudo nano {secrets_file}",
+                ]
+            else:
+                ssh_cmd = [
+                    "gcloud", "compute", "ssh",
+                    vm.config.vm_name,
+                    f"--zone={vm.config.zone}",
+                    f"--project={vm.config.project}",
+                    "--",
+                    f"sudo nano {secrets_file}",
+                ]
+
+            sp.run(ssh_cmd, check=False)
+            console.print("[green]✓ Done editing secrets[/green]")
+            console.print(
+                "\n[yellow]Restart openclaw-gateway to apply changes:[/yellow]"
+            )
+            console.print("  vmctl restart --app-dir /srv/vmctl/apps/openclaw-gateway")
+            return
+
+        if secrets_to_set:
+            # Validate and set secrets
+            parsed_secrets: list[tuple[str, str]] = []
+            for secret in secrets_to_set:
+                if "=" not in secret:
+                    console.print(
+                        f"[red]Invalid secret format: {secret}[/red]"
+                    )
+                    console.print("Expected format: KEY=VALUE")
+                    raise click.Abort()
+                key, value = secret.split("=", 1)
+                if not key:
+                    console.print("[red]Secret key cannot be empty[/red]")
+                    raise click.Abort()
+                parsed_secrets.append((key, value))
+
+            console.print(
+                f"[bold cyan]Setting {len(parsed_secrets)} secret(s)...[/bold cyan]"
+            )
+
+            for key, value in parsed_secrets:
+                # Use sed to update or append the secret
+                # Escape special characters in value for sed
+                escaped_value = value.replace("'", "'\"'\"'")
+                set_cmd = f"""
+SECRET_KEY="{key}"
+SECRET_VALUE='{escaped_value}'
+SECRETS_FILE="{secrets_file}"
+
+# Create file if it doesn't exist
+sudo touch "$SECRETS_FILE"
+sudo chmod 600 "$SECRETS_FILE"
+
+# Remove existing key if present (case-sensitive exact match)
+sudo sed -i "/^$SECRET_KEY=/d" "$SECRETS_FILE"
+
+# Append new value
+echo "$SECRET_KEY=$SECRET_VALUE" | sudo tee -a "$SECRETS_FILE" > /dev/null
+
+echo "Set $SECRET_KEY"
+"""
+                success, stdout, stderr = vm.ssh_exec(set_cmd)
+                if success:
+                    console.print(f"  [green]✓ {key}[/green]")
+                else:
+                    console.print(f"  [red]✗ {key}: {stderr}[/red]")
+                    raise click.Abort()
+
+            console.print("\n[green]✓ Secrets updated[/green]")
+            console.print(
+                "\n[yellow]Restart openclaw-gateway to apply changes:[/yellow]"
+            )
+            console.print("  vmctl restart --app-dir /srv/vmctl/apps/openclaw-gateway")
+            return
+
+        # No action specified - show help
+        console.print("Usage: vmctl secrets [OPTIONS]")
+        console.print("\nOptions:")
+        console.print("  -s, --set KEY=VALUE  Set a secret (repeatable)")
+        console.print("  -l, --list           List secret keys")
+        console.print("  -e, --edit           Edit secrets interactively")
+        console.print("\nExamples:")
+        console.print(
+            "  vmctl secrets -s AZURE_OPENAI_API_KEY=xxx -s AZURE_OPENAI_HOST=yyy"
+        )
+        console.print("  vmctl secrets --list")
 
     except VMError as e:
         console.print(f"[red]Error: {e}[/red]")

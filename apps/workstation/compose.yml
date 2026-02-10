@@ -19,9 +19,10 @@ services:
     volumes:
       # Shared workspace - visible to both life and dev
       - workspace:/workspace
-      # Agent app area access (read/review agent outputs)
-      - agent-state:/agent/state:ro
-      - agent-outbox:/agent/outbox:ro
+      # Agent app area access (full access like dev - life is operator zone)
+      - agent-state:/agent/state
+      - agent-outbox:/agent/outbox
+      # Agent app code - read-only so changes go through dev
       - agent-repo:/agent/repo:ro
     environment:
       - ZONE=life
@@ -67,24 +68,24 @@ volumes:
       device: ${WORKSPACE_HOST_DIR:-/workspace}
 
   # Agent app area volumes - isolated from agent's /workspace access
-  # These can be bind-mounted from a separate agent data directory
+  # These bind to the openclaw-gateway agent directory structure
   agent-state:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ${AGENT_HOST_DIR:-/srv/vmctl/agent}/state
+      device: ${AGENT_HOST_DIR:-/srv/vmctl/agent/openclaw-gateway}/state
 
   agent-outbox:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ${AGENT_HOST_DIR:-/srv/vmctl/agent}/outbox
+      device: ${AGENT_HOST_DIR:-/srv/vmctl/agent/openclaw-gateway}/outbox
 
   agent-repo:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ${AGENT_HOST_DIR:-/srv/vmctl/agent}/repo
+      device: ${AGENT_HOST_DIR:-/srv/vmctl/agent/openclaw-gateway}/repo

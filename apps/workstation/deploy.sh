@@ -14,10 +14,11 @@ echo "Workstation deploy hook: Setting up directories..."
 WORKSPACE_DIR="${WORKSPACE_HOST_DIR:-/workspace}"
 AGENT_DATA_DIR="${AGENT_HOST_DIR:-/srv/vmctl/agent}"
 
-# Create shared workspace directory
+# Create shared workspace directory (needs sudo for /workspace at root)
 if [ ! -d "$WORKSPACE_DIR" ]; then
     echo "Creating workspace directory: $WORKSPACE_DIR"
-    mkdir -p "$WORKSPACE_DIR"
+    sudo mkdir -p "$WORKSPACE_DIR"
+    sudo chown "$(whoami):$(whoami)" "$WORKSPACE_DIR"
 fi
 
 # Create agent app area directories

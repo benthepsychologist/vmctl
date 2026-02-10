@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy hook for molt-gateway agent zone app
+# Deploy hook for openclaw-gateway agent zone app
 #
 # This script runs before `docker compose up` as a preflight.
 #
@@ -7,14 +7,14 @@
 # privileged operations here. Instead, validate prerequisites and
 # fail fast with clear instructions.
 #
-# Called by: vmctl deploy --app-dir /srv/vmctl/apps/molt-gateway
+# Called by: vmctl deploy --app-dir /srv/vmctl/apps/openclaw-gateway
 
 set -euo pipefail
 
-echo "molt-gateway deploy hook: Preflight checks..."
+echo "openclaw-gateway deploy hook: Preflight checks..."
 
-# Canonical host layout for molt-gateway agent data
-BASE_DIR="/srv/vmctl/agent/molt-gateway"
+# Canonical host layout for openclaw-gateway agent data
+BASE_DIR="/srv/vmctl/agent/openclaw-gateway"
 
 missing=0
 
@@ -55,21 +55,21 @@ if [ "$missing" -ne 0 ]; then
 Preflight failed.
 
 Expected canonical layout:
-  /srv/vmctl/apps/molt-gateway/              (compose app dir; this directory)
-  /srv/vmctl/agent/molt-gateway/repo/        (molt-gateway git checkout)
-  /srv/vmctl/agent/molt-gateway/outbox/      (RW outbox)
-  /srv/vmctl/agent/molt-gateway/state/       (RW state)
-  /srv/vmctl/agent/molt-gateway/secrets/agent.env
+  /srv/vmctl/apps/openclaw-gateway/              (compose app dir; this directory)
+  /srv/vmctl/agent/openclaw-gateway/repo/        (openclaw-gateway git checkout)
+  /srv/vmctl/agent/openclaw-gateway/outbox/      (RW outbox)
+  /srv/vmctl/agent/openclaw-gateway/state/       (RW state)
+  /srv/vmctl/agent/openclaw-gateway/secrets/agent.env
 
 Fix on the VM (example):
-  sudo mkdir -p /srv/vmctl/agent/molt-gateway/{repo,outbox,state,secrets}
-  sudo touch /srv/vmctl/agent/molt-gateway/secrets/agent.env
-  sudo chmod 600 /srv/vmctl/agent/molt-gateway/secrets/agent.env
-  sudo chown root:root /srv/vmctl/agent/molt-gateway/secrets/agent.env
-  sudo chmod 777 /srv/vmctl/agent/molt-gateway/{outbox,state}
+  sudo mkdir -p /srv/vmctl/agent/openclaw-gateway/{repo,outbox,state,secrets}
+  sudo touch /srv/vmctl/agent/openclaw-gateway/secrets/agent.env
+  sudo chmod 600 /srv/vmctl/agent/openclaw-gateway/secrets/agent.env
+  sudo chown root:root /srv/vmctl/agent/openclaw-gateway/secrets/agent.env
+  sudo chmod 777 /srv/vmctl/agent/openclaw-gateway/{outbox,state}
 
 Then ensure the repo exists:
-  sudo git clone <molt-gateway-url> /srv/vmctl/agent/molt-gateway/repo
+  sudo git clone <openclaw-gateway-url> /srv/vmctl/agent/openclaw-gateway/repo
 
 EOF
     exit 1

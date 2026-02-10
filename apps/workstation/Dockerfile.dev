@@ -63,11 +63,16 @@ RUN mkdir -p /agent/state /agent/outbox /agent/repo
 
 USER coder
 
-# Install Claude Code CLI globally
-RUN npm install -g @anthropic-ai/claude-code
+# Set up npm to install global packages in user directory
+RUN npm config set prefix '/home/coder/.npm-global' && \
+    mkdir -p /home/coder/.npm-global
 
-# Install useful global npm packages for development
+# Install Claude Code CLI and dev tools (may fail if package unavailable)
+RUN npm install -g @anthropic-ai/claude-code || echo "Claude Code install skipped"
 RUN npm install -g typescript ts-node
+
+# Add npm global to PATH
+ENV PATH="/home/coder/.npm-global/bin:$PATH"
 
 # Copy entrypoint script
 COPY --chown=coder:coder entrypoint-dev.sh /entrypoint.sh

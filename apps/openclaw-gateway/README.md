@@ -1,6 +1,6 @@
-# molt-gateway Agent Zone App
+# openclaw-gateway Agent Zone App
 
-Agent-zone compose app for molt-gateway with strict filesystem isolation.
+Agent-zone compose app for openclaw-gateway with strict filesystem isolation.
 
 ## Trust Boundary
 
@@ -14,13 +14,13 @@ This app enforces a one-way filesystem boundary:
 ```
 /srv/vmctl/
 ├── apps/
-│   └── molt-gateway/        # Compose app directory (vmctl --app-dir target)
+│   └── openclaw-gateway/        # Compose app directory (vmctl --app-dir target)
 │       ├── compose.yml
 │       ├── deploy.sh
 │       └── agent.env.example
 └── agent/
-    └── molt-gateway/
-        ├── repo/            # Git checkout of molt-gateway (agent sees as /app:ro)
+    └── openclaw-gateway/
+        ├── repo/            # Git checkout of openclaw-gateway (agent sees as /app:ro)
         ├── outbox/          # Cross-zone artifact channel (agent sees as /outbox:rw)
         ├── state/           # Runtime state - sqlite, caches (agent sees as /state:rw)
         └── secrets/
@@ -33,36 +33,36 @@ This app enforces a one-way filesystem boundary:
 
 ```bash
 # 1. Create agent directories on VM
-sudo mkdir -p /srv/vmctl/agent/molt-gateway/{repo,outbox,state,secrets}
+sudo mkdir -p /srv/vmctl/agent/openclaw-gateway/{repo,outbox,state,secrets}
 
-# 2. Clone molt-gateway repo (or otherwise place a checkout at this path)
-sudo git clone <molt-gateway-url> /srv/vmctl/agent/molt-gateway/repo
+# 2. Clone openclaw-gateway repo (or otherwise place a checkout at this path)
+sudo git clone <openclaw-gateway-url> /srv/vmctl/agent/openclaw-gateway/repo
 
 # 3. Add granted tokens
-sudo cp /srv/vmctl/apps/molt-gateway/agent.env.example /srv/vmctl/agent/molt-gateway/secrets/agent.env
-sudo chmod 600 /srv/vmctl/agent/molt-gateway/secrets/agent.env
-sudo chown root:root /srv/vmctl/agent/molt-gateway/secrets/agent.env
+sudo cp /srv/vmctl/apps/openclaw-gateway/agent.env.example /srv/vmctl/agent/openclaw-gateway/secrets/agent.env
+sudo chmod 600 /srv/vmctl/agent/openclaw-gateway/secrets/agent.env
+sudo chown root:root /srv/vmctl/agent/openclaw-gateway/secrets/agent.env
 # Edit to add actual tokens
 
 # 4. Deploy (compose app dir)
-vmctl deploy --app-dir /srv/vmctl/apps/molt-gateway
+vmctl deploy --app-dir /srv/vmctl/apps/openclaw-gateway
 ```
 
 ### Day N: Operations
 
 ```bash
 # Check status
-vmctl ps --app-dir /srv/vmctl/apps/molt-gateway
+vmctl ps --app-dir /srv/vmctl/apps/openclaw-gateway
 
 # View logs
-vmctl logs --app-dir /srv/vmctl/apps/molt-gateway
-vmctl logs -f --app-dir /srv/vmctl/apps/molt-gateway  # follow
+vmctl logs --app-dir /srv/vmctl/apps/openclaw-gateway
+vmctl logs -f --app-dir /srv/vmctl/apps/openclaw-gateway  # follow
 
 # Restart
-vmctl restart --app-dir /srv/vmctl/apps/molt-gateway
+vmctl restart --app-dir /srv/vmctl/apps/openclaw-gateway
 
 # Redeploy (after repo update)
-vmctl deploy --app-dir /srv/vmctl/apps/molt-gateway
+vmctl deploy --app-dir /srv/vmctl/apps/openclaw-gateway
 ```
 
 ## Security Constraints
@@ -70,9 +70,9 @@ vmctl deploy --app-dir /srv/vmctl/apps/molt-gateway
 The compose file enforces these isolation rules:
 
 ### Allowed Mounts (allowlist)
-- `/srv/vmctl/agent/molt-gateway/repo:/app:ro` - Code (read-only)
-- `/srv/vmctl/agent/molt-gateway/outbox:/outbox:rw` - Artifacts
-- `/srv/vmctl/agent/molt-gateway/state:/state:rw` - State
+- `/srv/vmctl/agent/openclaw-gateway/repo:/app:ro` - Code (read-only)
+- `/srv/vmctl/agent/openclaw-gateway/outbox:/outbox:rw` - Artifacts
+- `/srv/vmctl/agent/openclaw-gateway/state:/state:rw` - State
 
 ### Forbidden (not mounted)
 - `/workspace` - No access to shared workspace
@@ -92,16 +92,16 @@ After deployment, verify isolation:
 
 ```bash
 # Check mounts (should show only repo/outbox/state)
-docker inspect molt-gateway --format '{{range .Mounts}}{{.Source}} -> {{.Destination}} ({{.Mode}}){{"\n"}}{{end}}'
+docker inspect openclaw-gateway --format '{{range .Mounts}}{{.Source}} -> {{.Destination}} ({{.Mode}}){{"\n"}}{{end}}'
 
 # Verify /workspace is not accessible
-docker exec molt-gateway ls /workspace 2>&1  # Should fail
+docker exec openclaw-gateway ls /workspace 2>&1  # Should fail
 
 # Verify no docker socket
-docker exec molt-gateway ls /var/run/docker.sock 2>&1  # Should fail
+docker exec openclaw-gateway ls /var/run/docker.sock 2>&1  # Should fail
 
 # Verify environment (only granted tokens)
-docker exec molt-gateway env | grep -v '^PATH=' | grep -v '^HOME='
+docker exec openclaw-gateway env | grep -v '^PATH=' | grep -v '^HOME='
 ```
 
 ## Secrets Policy
