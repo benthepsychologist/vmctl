@@ -1,5 +1,13 @@
 # vmctl
 
+> **Note (Feb 2026)**: vmctl development is paused after Gate 6. See [SIMPLE_SETUP.md](./SIMPLE_SETUP.md) for current deployment approach.
+>
+> We're using a simpler setup while learning Docker and gcloud directly. OpenClaw runs via docker-compose from `apps/openclaw-gateway/`. Development happens directly on the VM via VS Code Remote-SSH.
+>
+> We may resume vmctl once we've learned the underlying systems and understand what abstraction would actually be useful.
+
+---
+
 > Replace Google Cloud Workstations with self-managed VMs and save **$91-124/month**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
