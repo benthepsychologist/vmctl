@@ -43,42 +43,92 @@ This app enforces a one-way filesystem boundary:
 
 See [SECRETS_SETUP.md](SECRETS_SETUP.md) for one-time GCP setup.
 
-### Day 1: Initial Setup
+### Prerequisites (One-Time Setup)
+
+**On local machine:**
+1. Set up Google Secrets Manager (see [SECRETS_SETUP.md](SECRETS_SETUP.md))
+2. Ensure secrets are created in GCP project `molt-chatbot`
+
+**On VM:**
+1. Copy SSH keys so the VM can clone git repos:
+   ```bash
+   sudo mkdir -p /root/.ssh
+   sudo cp ~/.ssh/id_* /root/.ssh/
+   sudo chmod 600 /root/.ssh/id_*
+   sudo chmod 700 /root/.ssh
+   ```
+
+2. Grant VM service account access to GCP Secrets Manager:
+   ```bash
+   # Get your VM's service account ID
+   SA_ID=$(gcloud compute instances describe vmctl-prod --zone=us-west1-a --format='value(serviceAccounts[0].email)')
+
+   # Grant secretAccessor role
+   gcloud projects add-iam-policy-binding molt-chatbot \
+     --member="serviceAccount:$SA_ID" \
+     --role="roles/secretmanager.secretAccessor"
+   ```
+
+### Day 1: Initial Deployment
+
+**On VM:**
 
 ```bash
-# 1. Set up Google Secrets Manager (one-time, follows SECRETS_SETUP.md)
-PROJECT="molt-chatbot"
-echo "discord-token-here" | gcloud secrets create openclaw-discord-token --data-file=- --project="$PROJECT"
-echo "azure-key-here" | gcloud secrets create azure-openai-api-key --data-file=- --project="$PROJECT"
-# ... (see SECRETS_SETUP.md for all secrets)
+# 1. Pull latest vmctl repo
+cd /workspace/vmctl && git pull
 
-# 2. Create agent directories on VM
+# 2. Create agent directories
 sudo mkdir -p /srv/vmctl/agent/openclaw-gateway/{repo,outbox,state,secrets}
 
-# 3. Clone openclaw-gateway repo
-sudo git clone <openclaw-gateway-url> /srv/vmctl/agent/openclaw-gateway/repo
+# 3. Clone openclaw-gateway repo (using local copy if SSH unavailable)
+sudo cp -r /workspace/openclaw-gateway /srv/vmctl/agent/openclaw-gateway/repo
+# OR if SSH works:
+# sudo git clone git@github.com:benthepsychologist/openclaw-gateway.git /srv/vmctl/agent/openclaw-gateway/repo
 
-# 4. Deploy (fetches secrets from GCP automatically)
-bash /srv/vmctl/apps/openclaw-gateway/deploy-with-secrets.sh
+# 4. Fix ownership
+sudo chown -R $USER:$USER /srv/vmctl/agent/openclaw-gateway
+
+# 5. Deploy with secrets from GCP
+cd /srv/vmctl/apps/openclaw-gateway
+sudo bash deploy-with-secrets.sh --fresh
+
+# 6. Verify
+docker compose logs -f openclaw
 ```
+
+Expected output: `gateway entered RUNNING state` and `feed entered RUNNING state`
 
 ### Day N: Operations
 
+**Rebuild with latest code:**
 ```bash
-# Quick rebuild with fresh secrets
-bash /srv/vmctl/apps/openclaw-gateway/deploy-with-secrets.sh
+# Auto-pulls from git, fetches fresh secrets, rebuilds
+cd /srv/vmctl/apps/openclaw-gateway
+sudo bash deploy-with-secrets.sh
+```
 
-# Rebuild only (don't restart)
-bash /srv/vmctl/apps/openclaw-gateway/deploy-with-secrets.sh --rebuild-only
+**Plugin installation & testing:**
+```bash
+# SSH into container
+sudo docker compose exec openclaw bash
 
-# Check status
-docker ps | grep openclaw-gateway
+# Inside container
+openclaw plugin install <plugin-name>
+openclaw doctor --fix  # Apply config migrations
+openclaw status        # Check health
+```
 
-# View logs
-docker logs -f openclaw-gateway
+**Logs & debugging:**
+```bash
+# Follow logs
+sudo docker compose logs -f openclaw
 
-# Manual restart
-docker restart openclaw-gateway
+# Check if secrets loaded
+cat /srv/vmctl/agent/openclaw-gateway/secrets/agent.env
+
+# Inspect container
+docker ps | grep openclaw
+docker inspect openclaw-gateway
 ```
 
 ## Security Constraints
