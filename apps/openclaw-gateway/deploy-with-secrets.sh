@@ -6,21 +6,24 @@
 #   - Secrets stored in GCP (see SECRETS_SETUP.md)
 #
 # Usage:
-#   ./deploy-with-secrets.sh [--rebuild-only] [--no-restart]
+#   ./deploy-with-secrets.sh [--rebuild-only] [--no-restart] [--fresh]
 
 set -euo pipefail
 
 REPO_PATH="${REPO_PATH:-/srv/vmctl/agent/openclaw-gateway/repo}"
 SECRETS_DIR="${SECRETS_DIR:-/srv/vmctl/agent/openclaw-gateway/secrets}"
+STATE_DIR="${STATE_DIR:-/srv/vmctl/agent/openclaw-gateway/state}"
 PROJECT="${GCP_PROJECT:-molt-chatbot}"
 
 # Parse flags
 REBUILD_ONLY=false
 NO_RESTART=false
+FRESH=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         --rebuild-only) REBUILD_ONLY=true; shift ;;
         --no-restart) NO_RESTART=true; shift ;;
+        --fresh) FRESH=true; shift ;;
         *) echo "Unknown flag: $1"; exit 1 ;;
     esac
 done
@@ -79,6 +82,16 @@ echo "✅ Secrets loaded: $(wc -l < "$SECRETS_DIR/agent.env") lines"
 if [ "$REBUILD_ONLY" = true ]; then
     echo "✓ Secrets ready (--rebuild-only: skipping rebuild and restart)"
     exit 0
+fi
+
+# Fresh volume wipe (optional)
+if [ "$FRESH" = true ]; then
+    echo ""
+    echo "🧹 Wiping state volume (--fresh mode)..."
+    docker stop openclaw-gateway 2>/dev/null || true
+    docker rm openclaw-gateway 2>/dev/null || true
+    sudo rm -rf "$STATE_DIR"/*
+    echo "✓ State volume wiped"
 fi
 
 # Rebuild image
