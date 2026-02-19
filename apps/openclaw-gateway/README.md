@@ -93,22 +93,40 @@ The compose file enforces these isolation rules:
 - Python packages in virtual environment (isolated from system)
 - NOTE: `read_only: true` removed to allow state/plugin mutation (required for OpenClaw self-configuration)
 
-## Plugin Installation & Self-Configuration
+## Recommended Workflow: Hybrid Dev/Prod
 
-OpenClaw can now self-configure, install plugins, and mutate its state:
-
+**For code changes (git discipline):**
 ```bash
-# SSH into container to manually install plugins
-docker exec -it openclaw-gateway bash
+# Edit repo on host
+vim /srv/vmctl/agent/openclaw-gateway/repo/src/...
+git -C /srv/vmctl/agent/openclaw-gateway/repo add .
+git -C /srv/vmctl/agent/openclaw-gateway/repo commit -m "..."
+git -C /srv/vmctl/agent/openclaw-gateway/repo push origin main
 
-# Inside container, install npm plugin (persists in /state)
-openclaw plugin install <plugin-name>
-
-# Or use OpenClaw's CLI to self-configure
-openclaw config set key value
+# Rebuild container to pick up changes
+docker build -t openclaw-gateway:agent /srv/vmctl/agent/openclaw-gateway/repo
+docker restart openclaw-gateway
 ```
 
-Plugins and configuration are persisted in `/state` (volume-mounted), so they survive container restarts.
+**For plugin/config testing (quick iteration):**
+```bash
+# SSH into container
+docker exec -it openclaw-gateway bash
+
+# Install plugins (persists in /state)
+openclaw plugin install <plugin-name>
+
+# Configure
+openclaw config set key value
+
+# Test/debug
+openclaw ...
+```
+
+**Key points:**
+- **Code**: Edit on host → git → rebuild (dev/prod separation)
+- **Plugins/config**: `docker exec` directly (fast feedback, persists in `/state`)
+- **State changes**: Automatically persisted in `/srv/vmctl/agent/openclaw-gateway/state` (survives restarts)
 
 ## Verification
 
