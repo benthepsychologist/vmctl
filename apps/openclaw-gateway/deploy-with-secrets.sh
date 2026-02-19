@@ -104,10 +104,10 @@ if [ "$NO_RESTART" = true ]; then
     exit 0
 fi
 
-# Restart container
+# Start/restart container
 echo ""
-echo "🚀 Restarting container..."
-docker restart openclaw-gateway
+echo "🚀 Starting container..."
+docker compose up -d
 
 echo ""
 echo "✅ Deployment complete!"
