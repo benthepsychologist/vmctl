@@ -34,40 +34,51 @@ This app enforces a one-way filesystem boundary:
 
 ## Deployment
 
+### Secrets Management (Google Secrets Manager)
+
+⚠️ **CRITICAL**: Secrets are fetched from Google Secrets Manager at deploy time.
+- **Never** commit secrets to git
+- **Never** hardcode in Dockerfile
+- Always use `deploy-with-secrets.sh` for rebuilds
+
+See [SECRETS_SETUP.md](SECRETS_SETUP.md) for one-time GCP setup.
+
 ### Day 1: Initial Setup
 
 ```bash
-# 1. Create agent directories on VM
+# 1. Set up Google Secrets Manager (one-time, follows SECRETS_SETUP.md)
+PROJECT="molt-chatbot"
+echo "discord-token-here" | gcloud secrets create openclaw-discord-token --data-file=- --project="$PROJECT"
+echo "azure-key-here" | gcloud secrets create azure-openai-api-key --data-file=- --project="$PROJECT"
+# ... (see SECRETS_SETUP.md for all secrets)
+
+# 2. Create agent directories on VM
 sudo mkdir -p /srv/vmctl/agent/openclaw-gateway/{repo,outbox,state,secrets}
 
-# 2. Clone openclaw-gateway repo (or otherwise place a checkout at this path)
+# 3. Clone openclaw-gateway repo
 sudo git clone <openclaw-gateway-url> /srv/vmctl/agent/openclaw-gateway/repo
 
-# 3. Add granted tokens
-sudo cp /srv/vmctl/apps/openclaw-gateway/agent.env.example /srv/vmctl/agent/openclaw-gateway/secrets/agent.env
-sudo chmod 600 /srv/vmctl/agent/openclaw-gateway/secrets/agent.env
-sudo chown root:root /srv/vmctl/agent/openclaw-gateway/secrets/agent.env
-# Edit to add actual tokens
-
-# 4. Deploy (compose app dir)
-vmctl deploy --app-dir /srv/vmctl/apps/openclaw-gateway
+# 4. Deploy (fetches secrets from GCP automatically)
+bash /srv/vmctl/apps/openclaw-gateway/deploy-with-secrets.sh
 ```
 
 ### Day N: Operations
 
 ```bash
+# Quick rebuild with fresh secrets
+bash /srv/vmctl/apps/openclaw-gateway/deploy-with-secrets.sh
+
+# Rebuild only (don't restart)
+bash /srv/vmctl/apps/openclaw-gateway/deploy-with-secrets.sh --rebuild-only
+
 # Check status
-vmctl ps --app-dir /srv/vmctl/apps/openclaw-gateway
+docker ps | grep openclaw-gateway
 
 # View logs
-vmctl logs --app-dir /srv/vmctl/apps/openclaw-gateway
-vmctl logs -f --app-dir /srv/vmctl/apps/openclaw-gateway  # follow
+docker logs -f openclaw-gateway
 
-# Restart
-vmctl restart --app-dir /srv/vmctl/apps/openclaw-gateway
-
-# Redeploy (after repo update)
-vmctl deploy --app-dir /srv/vmctl/apps/openclaw-gateway
+# Manual restart
+docker restart openclaw-gateway
 ```
 
 ## Security Constraints
