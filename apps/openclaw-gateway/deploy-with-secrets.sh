@@ -94,6 +94,12 @@ if [ "$FRESH" = true ]; then
     echo "✓ State volume wiped"
 fi
 
+# Update repo from git
+echo ""
+echo "📦 Pulling latest code..."
+cd "$REPO_PATH"
+git pull
+
 # Rebuild image
 echo ""
 echo "🔨 Rebuilding Docker image..."
