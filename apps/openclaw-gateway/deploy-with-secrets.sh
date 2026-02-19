@@ -61,8 +61,8 @@ if [ -n "$AZURE_HOST" ]; then
     echo "AZURE_OPENAI_HOST=$AZURE_HOST" >> "$SECRETS_DIR/agent.env"
 fi
 
-echo "  • Fetching GOOGLE_API_KEY..."
-GOOGLE_KEY=$(gcloud secrets versions access latest --secret=google-api-key --project="$PROJECT" 2>/dev/null || echo "")
+echo "  • Fetching GOOGLE_API_KEY (Gemini)..."
+GOOGLE_KEY=$(gcloud secrets versions access latest --secret=gemini-api-key --project="$PROJECT" 2>/dev/null || echo "")
 if [ -n "$GOOGLE_KEY" ]; then
     echo "GOOGLE_API_KEY=$GOOGLE_KEY" >> "$SECRETS_DIR/agent.env"
 fi
