@@ -1,6 +1,11 @@
 # openclaw-gateway Agent Zone App
 
-Agent-zone compose app for openclaw-gateway with strict filesystem isolation.
+Agent-zone compose app for openclaw-gateway with containerized isolation and writable state.
+
+OpenClaw runs with ability to:
+- Mutate its state files (`/state`, sqlite, caches)
+- Install plugins and update npm packages
+- Self-configure and maintain runtime configuration
 
 ## Trust Boundary
 
@@ -71,8 +76,8 @@ The compose file enforces these isolation rules:
 
 ### Allowed Mounts (allowlist)
 - `/srv/vmctl/agent/openclaw-gateway/repo:/app:ro` - Code (read-only)
-- `/srv/vmctl/agent/openclaw-gateway/outbox:/outbox:rw` - Artifacts
-- `/srv/vmctl/agent/openclaw-gateway/state:/state:rw` - State
+- `/srv/vmctl/agent/openclaw-gateway/outbox:/outbox:rw` - Artifacts / cross-zone communication
+- `/srv/vmctl/agent/openclaw-gateway/state:/state:rw` - State, cache, plugins, sqlite
 
 ### Forbidden (not mounted)
 - `/workspace` - No access to shared workspace
@@ -80,11 +85,30 @@ The compose file enforces these isolation rules:
 - Host home directories - No user data access
 
 ### Hardening Applied
-- `read_only: true` - Root filesystem is read-only
+- Container runs as `openclaw` user (non-root)
 - `cap_drop: ["ALL"]` - All capabilities dropped
 - `security_opt: ["no-new-privileges:true"]` - No privilege escalation
 - `tmpfs: ["/tmp"]` - Writable tmp in memory only
 - No ports exposed - No inbound network access
+- Python packages in virtual environment (isolated from system)
+- NOTE: `read_only: true` removed to allow state/plugin mutation (required for OpenClaw self-configuration)
+
+## Plugin Installation & Self-Configuration
+
+OpenClaw can now self-configure, install plugins, and mutate its state:
+
+```bash
+# SSH into container to manually install plugins
+docker exec -it openclaw-gateway bash
+
+# Inside container, install npm plugin (persists in /state)
+openclaw plugin install <plugin-name>
+
+# Or use OpenClaw's CLI to self-configure
+openclaw config set key value
+```
+
+Plugins and configuration are persisted in `/state` (volume-mounted), so they survive container restarts.
 
 ## Verification
 
